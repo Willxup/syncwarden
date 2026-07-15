@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+mode=${FAKE_RSYNC_MODE:-success}
+state_file=${FAKE_RSYNC_STATE_FILE:-}
+args_file=${FAKE_RSYNC_ARGS_FILE:-}
+attempt=1
+
+if [[ -n "${FAKE_RSYNC_FAIL_HOST:-}" && "$*" == *"$FAKE_RSYNC_FAIL_HOST"* ]]; then
+    mode=${FAKE_RSYNC_FAIL_MODE:-fail23}
+fi
+
+if [[ -n "$args_file" ]]; then
+    printf '%s\n' "$*" >>"$args_file"
+fi
+
+if [[ -n "$state_file" ]]; then
+    if [[ -f "$state_file" ]]; then
+        attempt=$(( $(<"$state_file") + 1 ))
+    fi
+    printf '%s\n' "$attempt" >"$state_file"
+fi
+
+if [[ -n "${FAKE_RSYNC_MODE_SEQUENCE:-}" ]]; then
+    IFS=',' read -r -a mode_sequence <<<"$FAKE_RSYNC_MODE_SEQUENCE"
+    mode=${mode_sequence[$((attempt - 1))]:-${mode_sequence[$(( ${#mode_sequence[@]} - 1 ))]}}
+fi
+
+emit_attempt_output() {
+    local variable="FAKE_RSYNC_OUTPUT_$attempt"
+    local value=${FAKE_RSYNC_OUTPUT:-}
+    if [[ -v "$variable" ]]; then
+        value=${!variable}
+    fi
+    [[ -z "$value" ]] || printf '%s\n' "$value"
+}
+
+emit_attempt_output
+
+case "$mode" in
+    success)
+        exit 0
+        ;;
+    vanished)
+        printf 'rsync warning: some files vanished before they could be transferred (code 24)\n' >&2
+        exit 24
+        ;;
+    io-timeout)
+        printf 'rsync error: timeout in data send/receive (code 30)\n' >&2
+        exit 30
+        ;;
+    network-once)
+        if (( attempt == 1 )); then
+            printf 'rsync: connection unexpectedly closed (0 bytes received so far)\n' >&2
+            exit 255
+        fi
+        exit 0
+        ;;
+    fail23)
+        printf 'rsync: some files/attrs were not transferred (code 23)\n' >&2
+        exit 23
+        ;;
+    sleep)
+        sleep "${FAKE_RSYNC_SLEEP_SECONDS:-5}"
+        exit 0
+        ;;
+    ignore-term)
+        trap '' TERM
+        sleep "${FAKE_RSYNC_SLEEP_SECONDS:-5}"
+        exit 0
+        ;;
+    *)
+        printf 'unknown FAKE_RSYNC_MODE: %s\n' "$mode" >&2
+        exit 64
+        ;;
+esac

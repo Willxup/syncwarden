@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+if [[ "${FAKE_GZIP_MODE:-success}" == 'fail' ]]; then
+    printf 'fake gzip: compression refused\n' >&2
+    exit 1
+fi
+
+exec "${FAKE_REAL_GZIP_BIN:?FAKE_REAL_GZIP_BIN is required}" "$@"

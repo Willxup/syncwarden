@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+mode=${FAKE_ZIP_MODE:-success}
+
+if [[ -n "${FAKE_ZIP_ARGS_FILE:-}" ]]; then
+    printf '%s\n' "$*" >>"$FAKE_ZIP_ARGS_FILE"
+fi
+
+if [[ "${1-}" == '-T' ]]; then
+    if [[ "$mode" == 'verify-fail' ]]; then
+        printf 'fake zip verification failure\n' >&2
+        exit 8
+    fi
+    [[ -f "${2-}" ]] || exit 9
+    exit 0
+fi
+
+if [[ "$mode" == 'create-fail' ]]; then
+    printf 'fake zip creation failure\n' >&2
+    exit 7
+fi
+
+archive=''
+for argument in "$@"; do
+    case "$argument" in
+        -*) ;;
+        *)
+            archive=$argument
+            break
+            ;;
+    esac
+done
+
+[[ -n "$archive" ]] || {
+    printf 'fake zip: archive argument missing\n' >&2
+    exit 64
+}
+
+printf 'fake archive\n' >"$archive"
+
+if [[ -n "${FAKE_ZIP_COLLISION_PATH:-}" ]]; then
+    printf '%s\n' "${FAKE_ZIP_COLLISION_CONTENT:-manual collision}" >"$FAKE_ZIP_COLLISION_PATH"
+fi

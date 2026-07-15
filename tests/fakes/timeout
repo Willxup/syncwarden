@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+mode=${FAKE_TIMEOUT_MODE:-passthrough}
+
+if [[ -n "${FAKE_TIMEOUT_ARGS_FILE:-}" ]]; then
+    {
+        printf 'CALL\n'
+        printf 'ARG=%s\n' "$@"
+    } >>"$FAKE_TIMEOUT_ARGS_FILE"
+fi
+
+case "$mode" in
+    passthrough)
+        (( $# >= 4 )) || exit 64
+        shift 3
+        exec "$@"
+        ;;
+    expire)
+        exit 124
+        ;;
+    *)
+        printf 'unknown FAKE_TIMEOUT_MODE: %s\n' "$mode" >&2
+        exit 64
+        ;;
+esac

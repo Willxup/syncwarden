@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+mode=${FAKE_SSH_MODE:-success}
+state_file=${FAKE_SSH_STATE_FILE:-}
+attempt=1
+
+if [[ -n "${FAKE_SSH_FAIL_HOST:-}" && "$*" == *"$FAKE_SSH_FAIL_HOST"* ]]; then
+    mode=${FAKE_SSH_FAIL_MODE:-host-key}
+fi
+
+if [[ -n "$state_file" ]]; then
+    if [[ -f "$state_file" ]]; then
+        attempt=$(( $(<"$state_file") + 1 ))
+    fi
+    printf '%s\n' "$attempt" >"$state_file"
+fi
+
+case "$mode" in
+    success)
+        exit 0
+        ;;
+    host-key)
+        printf '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n' >&2
+        printf 'WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!\n' >&2
+        printf 'Host key verification failed.\n' >&2
+        exit 255
+        ;;
+    auth)
+        printf 'Permission denied (publickey).\n' >&2
+        exit 255
+        ;;
+    missing)
+        printf 'REMOTE_SOURCE_MISSING:/srv/example-source\n' >&2
+        exit 42
+        ;;
+    network-once)
+        if (( attempt == 1 )); then
+            printf 'ssh: connect to host example port 22: Connection timed out\n' >&2
+            exit 255
+        fi
+        exit 0
+        ;;
+    network-always)
+        printf 'ssh: connect to host example port 22: Connection refused\n' >&2
+        exit 255
+        ;;
+    execute-command)
+        remote_command=${!#}
+        sh -c "$remote_command"
+        ;;
+    *)
+        printf 'unknown FAKE_SSH_MODE: %s\n' "$mode" >&2
+        exit 64
+        ;;
+esac

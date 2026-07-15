@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+case "${FAKE_FIND_MODE:-success}" in
+    success)
+        exec "${FAKE_REAL_FIND_BIN:?FAKE_REAL_FIND_BIN is required}" "$@"
+        ;;
+    partial-fail)
+        [[ -z "${FAKE_FIND_PARTIAL_PATH:-}" ]] || printf '%s\0' "$FAKE_FIND_PARTIAL_PATH"
+        printf 'fake find: partial discovery failure\n' >&2
+        exit 1
+        ;;
+    sleep)
+        sleep "${FAKE_FIND_SLEEP_SECONDS:-5}"
+        exit 0
+        ;;
+    *)
+        printf 'fake find: unknown mode: %s\n' "$FAKE_FIND_MODE" >&2
+        exit 64
+        ;;
+esac

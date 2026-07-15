@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+if [[ "${FAKE_RM_MODE:-success}" == 'fail' ]]; then
+    printf 'fake rm: deletion refused\n' >&2
+    exit 1
+fi
+
+exec /bin/rm "$@"

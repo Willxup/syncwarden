@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+case "${FAKE_DF_MODE:-success}" in
+    success) ;;
+    sleep) sleep "${FAKE_DF_SLEEP_SECONDS:-5}" ;;
+    ignore-term)
+        trap '' TERM
+        sleep "${FAKE_DF_SLEEP_SECONDS:-5}"
+        ;;
+    *)
+        printf 'fake df: unknown mode: %s\n' "$FAKE_DF_MODE" >&2
+        exit 64
+        ;;
+esac
+
+case " $* " in
+    *' -Pm '*)
+        printf '%s\n' 'Filesystem 1048576-blocks Used Available Capacity Mounted on'
+        printf 'fake 100000 1 %s 1%% /\n' "${FAKE_DF_AVAILABLE_MB:-50000}"
+        ;;
+    *' -Pi '*)
+        printf '%s\n' 'Filesystem Inodes IUsed IFree IUse% Mounted on'
+        printf 'fake 100000 1 %s 1%% /\n' "${FAKE_DF_AVAILABLE_INODES:-50000}"
+        ;;
+    *)
+        printf 'fake df: unsupported arguments: %s\n' "$*" >&2
+        exit 64
+        ;;
+esac

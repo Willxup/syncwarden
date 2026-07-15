@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+case "${FAKE_SHA256_MODE:-success}" in
+    success)
+        printf '0123456789abcdef  %s\n' "${1-archive.zip}"
+        ;;
+    ignore-term)
+        trap '' TERM
+        sleep "${FAKE_SHA256_SLEEP_SECONDS:-5}"
+        printf '0123456789abcdef  %s\n' "${1-archive.zip}"
+        ;;
+    *)
+        printf 'fake sha256sum failure\n' >&2
+        exit 1
+        ;;
+esac
