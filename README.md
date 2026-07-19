@@ -277,18 +277,18 @@ state/syncwarden.lock       全局进程锁
 tmp/                        受管临时文件
 ```
 
-成功日志记录 created、updated、deleted、attempts 和统计完整性，不保存 rsync
+成功日志记录 created、updated、deleted、attempts 和完整状态，不保存 rsync
 逐文件名称。月度日志按自然月清理，人工命名的日志不会被处理。
 
 ### rsync code 24
 
-code 24 表示活跃源中的文件在扫描后、传输前消失。SyncWarden 将它视为实时镜像
-中的正常最终一致性行为：
+code 24 表示活跃源中的文件或目录在扫描、打开或传输前消失，例如运行中的程序
+删除或重命名临时文件。SyncWarden 将它视为实时镜像中的正常最终一致性行为：
 
 - source、服务器和批次保持 `SUCCESS`；
 - 不重试；
 - 不产生 WARNING 或 failure 日志；
-- 已观察的变化统计保留，但标记 `complete=no`。
+- 已观察的变化统计保留，并标记 `complete=yes`，表示本轮已按持续镜像策略完成。
 
 ### 退出码
 
@@ -353,8 +353,9 @@ rsync 镜像会删除远端已经不存在的对象。同步前 ZIP 保存的是
 
 ### code 24 是否代表备份失败？
 
-不是。它表示文件在活跃源中恰好于扫描后消失。SyncWarden 将其视为成功，但会用
-`complete=no` 标记变化统计并非完整快照。
+不是。它表示文件或目录在活跃源中恰好于扫描、打开或传输前消失。SyncWarden
+将其视为成功，并标记 `complete=yes`；这表示本轮已按持续镜像策略完成，不表示
+获得了源目录的原子时间点快照。
 
 ### dry-run 是否绝对不会写入任何文件？
 

@@ -1732,7 +1732,7 @@ test_sync_dry_run_and_code24_classification() {
     assert_eq 'SUCCESS' "${LAST_SYNC_STATUS-}" 'accepted code 24 exposes successful sync status'
     assert_eq 'FILES_VANISHED' "${LAST_FAILURE_REASON-}" 'code 24 classification is explicit'
     assert_eq '24' "${LAST_EXIT_CODE-}" 'accepted code 24 retains the native rsync exit code internally'
-    assert_eq 'no' "${LAST_CHANGE_COMPLETE-}" 'accepted code 24 keeps change statistics incomplete'
+    assert_eq 'yes' "${LAST_CHANGE_COMPLETE-}" 'accepted code 24 marks the accepted sync complete'
     unset FAKE_RSYNC_OUTPUT
 }
 
@@ -2551,7 +2551,7 @@ test_preflight_failure_marks_changes_unavailable() {
     unset SYNCWARDEN_NOW_EPOCH
 }
 
-test_code24_is_success_with_incomplete_counts_and_no_failure_log() {
+test_code24_is_success_with_complete_status_and_no_failure_log() {
     local tmp config payload success_content status_content rc
     tmp=$(make_temp_dir)
     config="$tmp/orchestration.conf"
@@ -2572,10 +2572,10 @@ test_code24_is_success_with_incomplete_counts_and_no_failure_log() {
     status_content=$(<"$LAST_STATUS_DIR/one.status")
     assert_eq '0' "$rc" 'code 24 is successful for a live mirror batch'
     assert_contains 'changes=2' "$success_content" 'success summary retains observed changes'
-    assert_contains 'complete=no' "$success_content" 'success summary marks change counts incomplete'
+    assert_contains 'complete=yes' "$success_content" 'success summary marks the accepted sync complete'
     assert_contains 'status=SUCCESS' "$status_content" 'last-status records accepted code 24 as success'
     assert_contains 'reason=SUCCESS' "$status_content" 'last-status has no warning reason for accepted code 24'
-    assert_contains 'change_complete=no' "$status_content" 'last-status keeps statistics incomplete'
+    assert_contains 'change_complete=yes' "$status_content" 'last-status marks the accepted sync complete'
     assert_file_not_exists "$FAILURE_LOG" 'accepted code 24 writes no failure log'
     assert_not_contains '__SYNCWARDEN_CHANGE__' "$success_content" 'internal rows never enter the success log'
     unset FAKE_RSYNC_OUTPUT SYNCWARDEN_NOW_EPOCH
@@ -2658,7 +2658,7 @@ test_change_parser_failure_warns_without_rewriting_transfer_result() {
 run_orchestration_suite() {
     test_real_sync_aggregates_changes_into_log_and_status
     test_preflight_failure_marks_changes_unavailable
-    test_code24_is_success_with_incomplete_counts_and_no_failure_log
+    test_code24_is_success_with_complete_status_and_no_failure_log
     test_archive_only_status_is_not_applicable
     test_multisource_aggregate_and_failed_source_attribution
     test_change_parser_failure_warns_without_rewriting_transfer_result

@@ -1751,7 +1751,7 @@ sync_source() {
             return 0
             ;;
         2)
-            LAST_CHANGE_COMPLETE='no'
+            LAST_CHANGE_COMPLETE='yes'
             LAST_SYNC_STATUS='SUCCESS'
             return 0
             ;;
