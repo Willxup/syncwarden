@@ -1851,6 +1851,26 @@ test_transfer_metrics_format_readable_units() {
     assert_eq '2.00KiB/s' "$(format_average_speed 4096 2000000)" 'average speed uses readable IEC units per second'
 }
 
+test_transfer_metrics_are_stable_in_comma_decimal_locale() {
+    local candidate sample comma_locale='' timer_value
+    for candidate in de_DE.UTF-8 de_DE.utf8 fr_FR.UTF-8 fr_FR.utf8; do
+        sample=$(LC_ALL="$candidate" awk 'BEGIN { printf "%.1f", 1.5 }' 2>/dev/null) || continue
+        if [[ "$sample" == '1,5' ]]; then
+            comma_locale=$candidate
+            break
+        fi
+    done
+    if [[ -z "$comma_locale" ]]; then
+        skip 'comma-decimal locale is unavailable for transfer metric regression coverage'
+        return
+    fi
+
+    timer_value=$(LC_ALL="$comma_locale" transfer_timer_now_us)
+    assert_matches '^[0-9]+$' "$timer_value" 'transfer timer remains an integer under a comma-decimal locale'
+    assert_eq '1.50KiB' "$(LC_ALL="$comma_locale" format_bytes_iec 1536)" 'transfer size keeps a stable decimal point across locales'
+    assert_eq '2.00KiB/s' "$(LC_ALL="$comma_locale" format_average_speed 4096 2000000)" 'average speed keeps a stable decimal point across locales'
+}
+
 test_rsync_retry_keeps_change_counts_and_resets_transfer_metrics() {
     local tmp destination deadline rc state
     tmp=$(make_temp_dir)
@@ -2010,6 +2030,7 @@ test_sync_local_mkdir_failure_sets_complete_result() {
 
 run_transport_suite() {
     test_transfer_metrics_format_readable_units
+    test_transfer_metrics_are_stable_in_comma_decimal_locale
     test_rsync_attempt_parser_classifies_and_filters_rows
     test_rsync_retry_keeps_change_counts_and_resets_transfer_metrics
     test_malformed_managed_row_marks_statistics_unavailable

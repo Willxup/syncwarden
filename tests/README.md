@@ -43,7 +43,7 @@ bash tests/run_tests.sh integration
 - source 与 destination 安全校验；
 - 私钥和 SSH 预检错误分类；
 - 瞬时错误重试和永久错误停止策略；
-- rsync 镜像、dry-run、code 24、传输大小和平均速度；
+- rsync 镜像、dry-run、code 24、传输大小、平均速度和区域设置一致性；
 - ZIP 创建、验证、原子提升和归档索引；
 - 最近归档与月末归档保留集合；
 - fail-closed 清理和月度日志维护；

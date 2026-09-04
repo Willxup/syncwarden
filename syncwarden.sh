@@ -1102,6 +1102,7 @@ wall_now_epoch() {
 }
 
 transfer_timer_now_us() {
+    local LC_ALL=C
     local value=${EPOCHREALTIME/./}
     printf '%s\n' "$value"
 }
@@ -1798,7 +1799,7 @@ format_duration() {
 
 format_bytes_iec() {
     local bytes=$1
-    awk -v bytes="$bytes" 'BEGIN {
+    LC_ALL=C awk -v bytes="$bytes" 'BEGIN {
         split("B KiB MiB GiB TiB PiB", units, " ")
         value = bytes + 0
         unit = 1
@@ -1815,7 +1816,7 @@ format_bytes_iec() {
 
 average_bytes_per_second() {
     local bytes=$1 duration_us=$2
-    awk -v bytes="$bytes" -v duration_us="$duration_us" 'BEGIN {
+    LC_ALL=C awk -v bytes="$bytes" -v duration_us="$duration_us" 'BEGIN {
         if (duration_us <= 0) exit 1
         printf "%.0f\n", bytes * 1000000 / duration_us
     }'
