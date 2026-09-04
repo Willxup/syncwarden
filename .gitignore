@@ -30,6 +30,6 @@ id_ed25519.pub
 *.swp
 *.swo
 
-# Local worktrees
-.worktrees/
-
+# Project-local Codex workflow and linked worktrees
+/.agents/
+/.worktrees/
