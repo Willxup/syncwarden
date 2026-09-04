@@ -277,8 +277,12 @@ state/syncwarden.lock       全局进程锁
 tmp/                        受管临时文件
 ```
 
-成功日志记录 created、updated、deleted、attempts 和完整状态，不保存 rsync
-逐文件名称。月度日志按自然月清理，人工命名的日志不会被处理。
+手动同步和定时同步的成功日志都会记录 created、updated、deleted、attempts、
+`transferred` 和 `avg_speed`，其中大小与速度使用 KiB、MiB、GiB 等易读单位。
+发生重试时，传输量和平均速度只记录最后一次 rsync 尝试；每次尝试都会重新计数
+和计时，不包含 ZIP 归档、预检及重试等待时间。`attempts` 字段仍会记录本轮实际
+尝试次数。日志不保存 rsync 逐文件名称。
+月度日志按自然月清理，人工命名的日志不会被处理。
 
 ### rsync code 24
 
