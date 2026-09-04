@@ -81,6 +81,17 @@ assert_not_contains() {
     fi
 }
 
+assert_matches() {
+    local pattern=$1
+    local actual=$2
+    local message=$3
+    if [[ "$actual" =~ $pattern ]]; then
+        pass "$message"
+    else
+        fail "$message (pattern='$pattern')"
+    fi
+}
+
 assert_file_exists() {
     local path=$1
     local message=$2
@@ -1634,6 +1645,7 @@ test_sync_command_preserves_mirror_semantics() {
     assert_contains '--delete' "$args" 'rsync command keeps delete semantics'
     assert_contains '--delete-delay' "$args" 'rsync command delays deletion'
     assert_contains '--timeout=300' "$args" 'rsync command uses configured I/O timeout'
+    assert_contains '--out-format=__SYNCWARDEN_CHANGE__:%i|%b' "$args" 'rsync command emits machine-readable change and byte statistics'
     assert_contains 'backup@source.example.net:/srv/data/' "$args" 'rsync command uses remote directory contents'
     assert_contains "$destination/data/" "$args" 'rsync command uses configured local name'
     assert_not_contains '--ignore-errors' "$args" 'rsync command never ignores I/O errors'
@@ -1817,7 +1829,7 @@ test_rsync_attempt_parser_classifies_and_filters_rows() {
     ensure_home_layout
     input="$tmp/attempt.out"
     diagnostic="$tmp/diagnostic.out"
-    write_file "$input" $'__SYNCWARDEN_CHANGE__:>f+++++++++\n__SYNCWARDEN_CHANGE__:>f.st......\n__SYNCWARDEN_CHANGE__:*deleting  \nrsync: connection unexpectedly closed'
+    write_file "$input" $'__SYNCWARDEN_CHANGE__:>f+++++++++|1024\n__SYNCWARDEN_CHANGE__:>f.st......|2048\n__SYNCWARDEN_CHANGE__:*deleting  |0\nrsync: connection unexpectedly closed'
     : >"$diagnostic"
     reset_last_change_stats
     consume_rsync_attempt_output "$input" "$diagnostic" 1
@@ -1827,12 +1839,19 @@ test_rsync_attempt_parser_classifies_and_filters_rows() {
     assert_eq '1' "$LAST_CHANGE_CREATED" 'new item is classified as created'
     assert_eq '1' "$LAST_CHANGE_UPDATED" 'existing item is classified as updated'
     assert_eq '1' "$LAST_CHANGE_DELETED" 'deletion is classified as deleted'
+    assert_eq '3072' "$LAST_TRANSFER_BYTES" 'actual transferred bytes are accumulated'
     assert_eq '1' "$LAST_CHANGE_ATTEMPTS" 'attempt number is retained'
     assert_not_contains '__SYNCWARDEN_CHANGE__' "$(<"$diagnostic")" 'managed rows are filtered from diagnostics'
     assert_contains 'connection unexpectedly closed' "$(<"$diagnostic")" 'real diagnostic text is retained'
 }
 
-test_rsync_retry_accumulates_each_attempt_before_overwrite() {
+test_transfer_metrics_format_readable_units() {
+    assert_eq '0B' "$(format_bytes_iec 0)" 'zero-byte transfer has a compact readable unit'
+    assert_eq '1.50KiB' "$(format_bytes_iec 1536)" 'transfer size uses readable IEC units'
+    assert_eq '2.00KiB/s' "$(format_average_speed 4096 2000000)" 'average speed uses readable IEC units per second'
+}
+
+test_rsync_retry_keeps_change_counts_and_resets_transfer_metrics() {
     local tmp destination deadline rc state
     tmp=$(make_temp_dir)
     destination="$tmp/payload"
@@ -1844,8 +1863,8 @@ test_rsync_retry_accumulates_each_attempt_before_overwrite() {
     state="$tmp/attempt-state"
     FAKE_RSYNC_MODE=network-once
     FAKE_RSYNC_STATE_FILE="$state"
-    FAKE_RSYNC_OUTPUT_1=$'__SYNCWARDEN_CHANGE__:>f+++++++++\n__SYNCWARDEN_CHANGE__:*deleting  '
-    FAKE_RSYNC_OUTPUT_2='__SYNCWARDEN_CHANGE__:>f.st......'
+    FAKE_RSYNC_OUTPUT_1=$'__SYNCWARDEN_CHANGE__:>f+++++++++|1024\n__SYNCWARDEN_CHANGE__:*deleting  |0'
+    FAKE_RSYNC_OUTPUT_2='__SYNCWARDEN_CHANGE__:>f.st......|2048'
     FAKE_RSYNC_ARGS_FILE="$tmp/args"
     export FAKE_RSYNC_MODE FAKE_RSYNC_STATE_FILE FAKE_RSYNC_OUTPUT_1 FAKE_RSYNC_OUTPUT_2 FAKE_RSYNC_ARGS_FILE
     deadline=$(( $(date +%s) + 30 ))
@@ -1853,6 +1872,8 @@ test_rsync_retry_accumulates_each_attempt_before_overwrite() {
     rc=$?
     assert_eq '0' "$rc" 'retrying transfer succeeds'
     assert_eq '3' "$LAST_CHANGE_COUNT" 'statistics include both attempts'
+    assert_eq '2048' "$LAST_TRANSFER_BYTES" 'retry resets transfer bytes to the final rsync attempt'
+    if (( LAST_TRANSFER_DURATION_US > 0 )); then pass 'transfer duration covers the final rsync attempt'; else fail 'transfer duration must be positive'; fi
     assert_eq '2' "$LAST_CHANGE_ATTEMPTS" 'statistics expose two attempts'
     assert_eq 'yes' "$LAST_CHANGE_COMPLETE" 'successful final attempt marks aggregate complete'
     unset FAKE_RSYNC_OUTPUT_1 FAKE_RSYNC_OUTPUT_2 FAKE_RSYNC_STATE_FILE
@@ -1894,7 +1915,7 @@ test_real_rsync_out_format_matches_parser_contract() {
     diagnostic="$tmp/real-rsync.diagnostic"
     : >"$diagnostic"
     real_rsync=$(command -v rsync)
-    "$real_rsync" -a --delete --itemize-changes '--out-format=__SYNCWARDEN_CHANGE__:%i' "$source/" "$destination/" >"$output" 2>&1
+    "$real_rsync" -a --delete --itemize-changes '--out-format=__SYNCWARDEN_CHANGE__:%i|%b' "$source/" "$destination/" >"$output" 2>&1
     rc=$?
     assert_eq '0' "$rc" 'local real rsync fixture succeeds'
     reset_last_change_stats
@@ -1905,6 +1926,7 @@ test_real_rsync_out_format_matches_parser_contract() {
     assert_eq '1' "$LAST_CHANGE_UPDATED" 'real rsync update is classified'
     assert_eq '1' "$LAST_CHANGE_DELETED" 'real rsync deletion is classified'
     assert_eq '3' "$LAST_CHANGE_COUNT" 'real rsync emits exactly the three fixture operations'
+    if (( LAST_TRANSFER_BYTES > 0 )); then pass 'real rsync exposes transferred bytes'; else fail 'real rsync transferred bytes must be positive'; fi
 }
 
 test_preflight_output_mktemp_failure_sets_explicit_reason() {
@@ -1987,8 +2009,9 @@ test_sync_local_mkdir_failure_sets_complete_result() {
 }
 
 run_transport_suite() {
+    test_transfer_metrics_format_readable_units
     test_rsync_attempt_parser_classifies_and_filters_rows
-    test_rsync_retry_accumulates_each_attempt_before_overwrite
+    test_rsync_retry_keeps_change_counts_and_resets_transfer_metrics
     test_malformed_managed_row_marks_statistics_unavailable
     test_real_rsync_out_format_matches_parser_contract
     test_preflight_host_key_and_auth_do_not_retry
@@ -2509,7 +2532,7 @@ test_real_sync_aggregates_changes_into_log_and_status() {
     SYNCWARDEN_NOW_EPOCH=$(date -d '2026-07-12 09:00:00 +0000' +%s)
     FAKE_SSH_MODE=success
     FAKE_RSYNC_MODE=success
-    FAKE_RSYNC_OUTPUT=$'__SYNCWARDEN_CHANGE__:>f+++++++++\n__SYNCWARDEN_CHANGE__:>f.st......\n__SYNCWARDEN_CHANGE__:*deleting  '
+    FAKE_RSYNC_OUTPUT=$'__SYNCWARDEN_CHANGE__:>f+++++++++|1024\n__SYNCWARDEN_CHANGE__:>f.st......|2048\n__SYNCWARDEN_CHANGE__:*deleting  |0'
     FAKE_RSYNC_ARGS_FILE="$tmp/args"
     export SYNCWARDEN_NOW_EPOCH FAKE_SSH_MODE FAKE_RSYNC_MODE FAKE_RSYNC_OUTPUT FAKE_RSYNC_ARGS_FILE
     refresh_log_paths
@@ -2522,9 +2545,13 @@ test_real_sync_aggregates_changes_into_log_and_status() {
     assert_contains 'created=1' "$content" 'success log records created count'
     assert_contains 'updated=1' "$content" 'success log records updated count'
     assert_contains 'deleted=1' "$content" 'success log records deleted count'
+    assert_contains 'transferred=3.00KiB' "$content" 'manual success log records readable transferred size'
+    assert_matches 'avg_speed=[0-9]+([.][0-9]+)?(B|KiB|MiB|GiB|TiB|PiB)/s' "$content" 'manual success log records readable average speed'
     assert_contains 'attempts=1' "$content" 'success log records rsync attempts'
     assert_contains 'complete=yes' "$content" 'success log marks complete statistics'
     assert_contains 'changes=3' "$status" 'last-status records total changes'
+    assert_contains 'transferred_bytes=3072' "$status" 'last-status records raw transferred bytes'
+    assert_contains 'average_bytes_per_second=' "$status" 'last-status records machine-readable average speed'
     assert_contains 'change_complete=yes' "$status" 'last-status records completeness'
     unset FAKE_RSYNC_OUTPUT SYNCWARDEN_NOW_EPOCH
 }
@@ -2562,7 +2589,7 @@ test_code24_is_success_with_complete_status_and_no_failure_log() {
     SYNCWARDEN_NOW_EPOCH=$(date -d '2026-07-12 09:00:00 +0000' +%s)
     FAKE_SSH_MODE=success
     FAKE_RSYNC_MODE=vanished
-    FAKE_RSYNC_OUTPUT=$'__SYNCWARDEN_CHANGE__:>f+++++++++\n__SYNCWARDEN_CHANGE__:*deleting  '
+    FAKE_RSYNC_OUTPUT=$'__SYNCWARDEN_CHANGE__:>f+++++++++|1024\n__SYNCWARDEN_CHANGE__:*deleting  |0'
     FAKE_RSYNC_ARGS_FILE="$tmp/args"
     export SYNCWARDEN_NOW_EPOCH FAKE_SSH_MODE FAKE_RSYNC_MODE FAKE_RSYNC_OUTPUT FAKE_RSYNC_ARGS_FILE
     refresh_log_paths
@@ -2615,7 +2642,7 @@ test_multisource_aggregate_and_failed_source_attribution() {
     FAKE_SSH_MODE=success
     FAKE_RSYNC_MODE_SEQUENCE='success,fail23'
     FAKE_RSYNC_STATE_FILE="$tmp/rsync-state"
-    FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++'
+    FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++|1024'
     FAKE_RSYNC_ARGS_FILE="$tmp/args"
     export SYNCWARDEN_NOW_EPOCH FAKE_SSH_MODE FAKE_RSYNC_MODE_SEQUENCE FAKE_RSYNC_STATE_FILE FAKE_RSYNC_OUTPUT FAKE_RSYNC_ARGS_FILE
     refresh_log_paths
@@ -2626,6 +2653,8 @@ test_multisource_aggregate_and_failed_source_attribution() {
     assert_contains 'Source          : second' "$content" 'failure identifies the failed local source name'
     assert_contains 'Changes         : 2' "$content" 'server summary aggregates both source attempts'
     assert_contains 'Rsync Attempts  : 2' "$content" 'server summary totals rsync invocations across sources'
+    assert_contains 'Transferred     : 2.00KiB' "$content" 'failure summary retains readable observed transfer size'
+    assert_contains 'Average Speed   :' "$content" 'failure summary retains readable observed average speed'
     assert_contains 'Change Complete : no' "$content" 'one failed source makes aggregate incomplete'
     unset FAKE_RSYNC_MODE_SEQUENCE FAKE_RSYNC_STATE_FILE FAKE_RSYNC_OUTPUT SYNCWARDEN_NOW_EPOCH
 }
@@ -3034,7 +3063,7 @@ test_real_modes_use_monthly_logs_and_dry_run_skips_maintenance() {
     SYNCWARDEN_NOW_EPOCH=$(date -d '2026-07-12 09:00:00 +0000' +%s)
     FAKE_SSH_MODE=success
     FAKE_RSYNC_MODE=success
-    FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++'
+    FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++|1024'
     FAKE_RSYNC_ARGS_FILE="$tmp/args"
     export SYNCWARDEN_NOW_EPOCH FAKE_SSH_MODE FAKE_RSYNC_MODE FAKE_RSYNC_OUTPUT FAKE_RSYNC_ARGS_FILE
 
@@ -3077,7 +3106,7 @@ test_log_maintenance_warning_changes_exit_without_hiding_server_failure() {
     printf 'collision\n' >"$ROTATED_LOG_DIR/success-2026-06.log.gz"
     FAKE_SSH_MODE=success
     FAKE_RSYNC_MODE=success
-    FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++'
+    FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++|1024'
     FAKE_RSYNC_ARGS_FILE="$tmp/args"
     export FAKE_SSH_MODE FAKE_RSYNC_MODE FAKE_RSYNC_OUTPUT FAKE_RSYNC_ARGS_FILE
     run_batch MANUAL 0 one >/dev/null
@@ -3105,7 +3134,7 @@ test_log_maintenance_warning_changes_exit_without_hiding_server_failure() {
 }
 
 test_archive_and_scheduled_maintenance_boundaries() {
-    local tmp config payload rc
+    local tmp config payload rc scheduled_content
     tmp=$(make_temp_dir)
     config="$tmp/integration.conf"
     payload="$tmp/payload"
@@ -3129,12 +3158,16 @@ test_archive_and_scheduled_maintenance_boundaries() {
     SYNCWARDEN_NOW_EPOCH=$(date -d '2026-07-12 03:00:00 +0000' +%s)
     FAKE_SSH_MODE=success
     FAKE_RSYNC_MODE=success
-    FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++'
+    FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++|1024'
     FAKE_RSYNC_ARGS_FILE="$tmp/due-args"
     export SYNCWARDEN_NOW_HOUR SYNCWARDEN_NOW_EPOCH FAKE_SSH_MODE FAKE_RSYNC_MODE FAKE_RSYNC_OUTPUT FAKE_RSYNC_ARGS_FILE
     run_integration_cli "$tmp/due-home" "$config" -s >/dev/null
     rc=$?
     assert_eq '0' "$rc" 'due scheduled run succeeds'
+    scheduled_content=$(<"$tmp/due-home/logs/success-2026-07.log")
+    assert_contains 'Mode     : SCHEDULED' "$scheduled_content" 'scheduled log identifies its mode'
+    assert_contains 'transferred=1.00KiB' "$scheduled_content" 'scheduled log records readable transferred size'
+    assert_matches 'avg_speed=[0-9]+([.][0-9]+)?(B|KiB|MiB|GiB|TiB|PiB)/s' "$scheduled_content" 'scheduled log records readable average speed'
     assert_file_not_exists "$tmp/due-home/logs/failure-2026-01.log" 'real scheduled run triggers expired managed-log cleanup'
 
     mkdir -p "$tmp/noop-home/logs/rotated"

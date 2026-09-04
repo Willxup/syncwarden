@@ -81,6 +81,8 @@ LAST_CHANGE_DELETED=0
 LAST_CHANGE_ATTEMPTS=0
 LAST_CHANGE_PARSE_FAILED=0
 LAST_CHANGE_COMPLETE='no'
+LAST_TRANSFER_BYTES=0
+LAST_TRANSFER_DURATION_US=0
 LAST_SOURCE_NAME=''
 
 declare -A GLOBAL=()
@@ -1099,6 +1101,11 @@ wall_now_epoch() {
     date +%s
 }
 
+transfer_timer_now_us() {
+    local value=${EPOCHREALTIME/./}
+    printf '%s\n' "$value"
+}
+
 archive_now_epoch() {
     if [[ -n "${SYNCWARDEN_NOW_EPOCH:-}" ]]; then
         printf '%s\n' "$SYNCWARDEN_NOW_EPOCH"
@@ -1431,18 +1438,27 @@ reset_last_change_stats() {
     LAST_CHANGE_ATTEMPTS=0
     LAST_CHANGE_PARSE_FAILED=0
     LAST_CHANGE_COMPLETE='no'
+    LAST_TRANSFER_BYTES=0
+    LAST_TRANSFER_DURATION_US=0
 }
 
 consume_rsync_attempt_output() {
     local input_file=$1 diagnostic_file=$2 attempt=$3
-    local line code filtered parse_failed=0
+    local line payload code bytes filtered parse_failed=0 code_length
     make_temp_file filtered "$TMP_DIR/rsync-filter.XXXXXX" || return 1
     : >"$filtered"
 
     while IFS= read -r line || [[ -n "$line" ]]; do
         if [[ "$line" == "$RSYNC_CHANGE_PREFIX"* ]]; then
-            code=${line#"$RSYNC_CHANGE_PREFIX"}
-            if (( ${#code} != 11 )); then
+            payload=${line#"$RSYNC_CHANGE_PREFIX"}
+            if [[ "$payload" != *'|'* ]]; then
+                parse_failed=1
+                continue
+            fi
+            code=${payload%%|*}
+            bytes=${payload#*|}
+            code_length=${#code}
+            if (( code_length < 11 || code_length > 12 )) || [[ ! "$bytes" =~ ^[0-9]+$ ]]; then
                 parse_failed=1
                 continue
             fi
@@ -1454,6 +1470,7 @@ consume_rsync_attempt_output() {
                 LAST_CHANGE_UPDATED=$((LAST_CHANGE_UPDATED + 1))
             fi
             LAST_CHANGE_COUNT=$((LAST_CHANGE_COUNT + 1))
+            LAST_TRANSFER_BYTES=$((LAST_TRANSFER_BYTES + bytes))
         else
             printf '%s\n' "$line" >>"$filtered"
         fi
@@ -1483,7 +1500,7 @@ run_command_with_retry() {
     local track_changes=$5
     shift 5
     local retry_count delay_string attempt=1 max_attempts rc reason delay
-    local attempt_file parse_rc
+    local attempt_file parse_rc attempt_started_us attempt_finished_us attempt_duration_us
     local -a delays=()
 
     retry_count=$(resolve_value "$id" retry_count)
@@ -1501,6 +1518,8 @@ run_command_with_retry() {
 
     while (( attempt <= max_attempts )); do
         if (( track_changes == 1 )); then
+            LAST_TRANSFER_BYTES=0
+            LAST_TRANSFER_DURATION_US=0
             make_temp_file attempt_file "$TMP_DIR/rsync-attempt.${id}.XXXXXX" || {
                 LAST_EXIT_CODE=1
                 LAST_FAILURE_REASON='TEMP_OUTPUT_FAILED'
@@ -1512,12 +1531,21 @@ run_command_with_retry() {
             : >"$attempt_file"
         fi
 
+        if (( track_changes == 1 )); then
+            attempt_started_us=$(transfer_timer_now_us)
+        fi
         if (( attempt_timeout_seconds > 0 )); then
             run_with_timeout "$attempt_timeout_seconds" "$@" >"$attempt_file" 2>&1
         else
             "$@" >"$attempt_file" 2>&1
         fi
         rc=$?
+        if (( track_changes == 1 )); then
+            attempt_finished_us=$(transfer_timer_now_us)
+            attempt_duration_us=$((attempt_finished_us - attempt_started_us))
+            (( attempt_duration_us > 0 )) || attempt_duration_us=1
+            LAST_TRANSFER_DURATION_US=$attempt_duration_us
+        fi
         reason=$(classify_failure "$rc" "$attempt_file")
         LAST_ATTEMPT_COUNT=$attempt
         LAST_EXIT_CODE=$rc
@@ -1707,7 +1735,7 @@ sync_source() {
     if (( dry_run == 1 )); then
         command+=(--dry-run --itemize-changes)
     else
-        command+=(--itemize-changes "--out-format=${RSYNC_CHANGE_PREFIX}%i")
+        command+=(--itemize-changes "--out-format=${RSYNC_CHANGE_PREFIX}%i|%b")
     fi
     command+=(
         -e "$rsh"
@@ -1768,6 +1796,40 @@ format_duration() {
     printf '%02dm%02ds' "$((seconds / 60))" "$((seconds % 60))"
 }
 
+format_bytes_iec() {
+    local bytes=$1
+    awk -v bytes="$bytes" 'BEGIN {
+        split("B KiB MiB GiB TiB PiB", units, " ")
+        value = bytes + 0
+        unit = 1
+        while (value >= 1024 && unit < 6) {
+            value /= 1024
+            unit++
+        }
+        if (unit == 1) printf "%.0f%s", value, units[unit]
+        else if (value < 10) printf "%.2f%s", value, units[unit]
+        else if (value < 100) printf "%.1f%s", value, units[unit]
+        else printf "%.0f%s", value, units[unit]
+    }'
+}
+
+average_bytes_per_second() {
+    local bytes=$1 duration_us=$2
+    awk -v bytes="$bytes" -v duration_us="$duration_us" 'BEGIN {
+        if (duration_us <= 0) exit 1
+        printf "%.0f\n", bytes * 1000000 / duration_us
+    }'
+}
+
+format_average_speed() {
+    local bytes=$1 duration_us=$2 bytes_per_second
+    bytes_per_second=$(average_bytes_per_second "$bytes" "$duration_us") || {
+        printf 'unavailable\n'
+        return 1
+    }
+    printf '%s/s\n' "$(format_bytes_iec "$bytes_per_second")"
+}
+
 format_global_runtime_limit() {
     local seconds=${1:-$GLOBAL_RUNTIME_TIMEOUT_SECONDS}
     printf '%02dh%02dm%02ds' \
@@ -1790,6 +1852,8 @@ reset_server_change_stats() {
     SERVER_CHANGE_DELETED=0
     SERVER_CHANGE_ATTEMPTS=0
     SERVER_CHANGE_COMPLETE='yes'
+    SERVER_TRANSFER_BYTES=0
+    SERVER_TRANSFER_DURATION_US=0
     SERVER_RSYNC_STARTED=0
     SERVER_CHANGE_SUMMARY_ATTACHED=0
 }
@@ -1807,6 +1871,8 @@ merge_last_change_stats() {
         SERVER_CHANGE_CREATED=$((SERVER_CHANGE_CREATED + LAST_CHANGE_CREATED))
         SERVER_CHANGE_UPDATED=$((SERVER_CHANGE_UPDATED + LAST_CHANGE_UPDATED))
         SERVER_CHANGE_DELETED=$((SERVER_CHANGE_DELETED + LAST_CHANGE_DELETED))
+        SERVER_TRANSFER_BYTES=$((SERVER_TRANSFER_BYTES + LAST_TRANSFER_BYTES))
+        SERVER_TRANSFER_DURATION_US=$((SERVER_TRANSFER_DURATION_US + LAST_TRANSFER_DURATION_US))
     fi
     [[ "$LAST_CHANGE_COMPLETE" == 'yes' ]] || SERVER_CHANGE_COMPLETE='no'
 }
@@ -1830,6 +1896,41 @@ server_change_value() {
     esac
 }
 
+server_transfer_bytes_value() {
+    server_change_value "$SERVER_TRANSFER_BYTES"
+}
+
+server_transfer_duration_value() {
+    server_change_value "$SERVER_TRANSFER_DURATION_US"
+}
+
+server_average_bps_value() {
+    case "$SERVER_CHANGE_STATE" in
+        numeric) average_bytes_per_second "$SERVER_TRANSFER_BYTES" "$SERVER_TRANSFER_DURATION_US" ;;
+        parse_failed|unavailable) printf 'unavailable\n' ;;
+        not_applicable) printf 'not_applicable\n' ;;
+        *) printf 'unavailable\n'; return 1 ;;
+    esac
+}
+
+server_transfer_size_display() {
+    case "$SERVER_CHANGE_STATE" in
+        numeric) format_bytes_iec "$SERVER_TRANSFER_BYTES" ;;
+        parse_failed|unavailable) printf 'unavailable\n' ;;
+        not_applicable) printf 'not_applicable\n' ;;
+        *) printf 'unavailable\n'; return 1 ;;
+    esac
+}
+
+server_average_speed_display() {
+    case "$SERVER_CHANGE_STATE" in
+        numeric) format_average_speed "$SERVER_TRANSFER_BYTES" "$SERVER_TRANSFER_DURATION_US" ;;
+        parse_failed|unavailable) printf 'unavailable\n' ;;
+        not_applicable) printf 'not_applicable\n' ;;
+        *) printf 'unavailable\n'; return 1 ;;
+    esac
+}
+
 render_server_change_summary() {
     local changes created updated deleted
     changes=$(server_change_value "$SERVER_CHANGE_COUNT")
@@ -1841,6 +1942,8 @@ render_server_change_summary() {
     printf '  Created         : %s\n' "$created"
     printf '  Updated         : %s\n' "$updated"
     printf '  Deleted         : %s\n' "$deleted"
+    printf '  Transferred     : %s\n' "$(server_transfer_size_display)"
+    printf '  Average Speed   : %s\n' "$(server_average_speed_display)"
     printf '  Rsync Attempts  : %s\n' "$SERVER_CHANGE_ATTEMPTS"
     printf '  Change Complete : %s\n' "$SERVER_CHANGE_COMPLETE"
 }
@@ -1872,6 +1975,9 @@ write_last_status() {
         printf 'created=%s\n' "$(server_change_value "$SERVER_CHANGE_CREATED")"
         printf 'updated=%s\n' "$(server_change_value "$SERVER_CHANGE_UPDATED")"
         printf 'deleted=%s\n' "$(server_change_value "$SERVER_CHANGE_DELETED")"
+        printf 'transferred_bytes=%s\n' "$(server_transfer_bytes_value)"
+        printf 'sync_duration_microseconds=%s\n' "$(server_transfer_duration_value)"
+        printf 'average_bytes_per_second=%s\n' "$(server_average_bps_value)"
         printf 'attempts=%s\n' "$SERVER_CHANGE_ATTEMPTS"
         printf 'change_complete=%s\n' "$SERVER_CHANGE_COMPLETE"
     } >"$temp"; then
@@ -2243,8 +2349,10 @@ run_server() {
         SERVER_RESULT_LINE=$(printf '[OK] %-20s archive=%-20s sync=%-8s duration=%s' \
             "$name" "$archive_summary" "$sync_summary" "$(format_duration "$duration")")
     else
-        SERVER_RESULT_LINE=$(printf '[OK] %-20s archive=%-20s sync=%-8s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s' \
+        SERVER_RESULT_LINE=$(printf '[OK] %-20s archive=%-20s sync=%-8s transferred=%s avg_speed=%s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s' \
             "$name" "$archive_summary" "$sync_summary" \
+            "$(server_transfer_size_display)" \
+            "$(server_average_speed_display)" \
             "$(server_change_value "$SERVER_CHANGE_COUNT")" \
             "$(server_change_value "$SERVER_CHANGE_CREATED")" \
             "$(server_change_value "$SERVER_CHANGE_UPDATED")" \
@@ -2453,12 +2561,8 @@ run_archive_only() {
     started=$(wall_now_epoch)
     name=$(resolve_value "$id" name)
     get_server_sources "$id" sources
+    reset_server_change_stats
     SERVER_CHANGE_STATE='not_applicable'
-    SERVER_CHANGE_COUNT=0
-    SERVER_CHANGE_CREATED=0
-    SERVER_CHANGE_UPDATED=0
-    SERVER_CHANGE_DELETED=0
-    SERVER_CHANGE_ATTEMPTS=0
     SERVER_CHANGE_COMPLETE='not_applicable'
     for spec in "${sources[@]}"; do
         local_name=$(source_local_name "$spec") || local_name='unknown'
