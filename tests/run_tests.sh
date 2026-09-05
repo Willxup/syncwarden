@@ -681,17 +681,17 @@ test_public_example_uses_approved_retention_policy() {
     assert_not_contains 'server_timeout_seconds=' "$content" 'public example has no shared server deadline'
 }
 
-test_public_docs_are_chinese_and_project_shaped() {
+test_public_docs_are_bilingual_and_project_shaped() {
     local readme example test_readme heading
     local -a headings=(
-        '## 核心特性'
-        '## 工作原理'
-        '## 快速开始'
-        '## 配置说明'
-        '## 命令'
-        '## 安全模型'
-        '## 常见问题'
-        '## 许可证'
+        '## Features'
+        '## How it works'
+        '## Quick start'
+        '## Configuration'
+        '## Commands'
+        '## Safety model'
+        '## FAQ'
+        '## License'
     )
 
     readme=$(<"$PROJECT_DIR/README.md")
@@ -701,8 +701,9 @@ test_public_docs_are_chinese_and_project_shaped() {
     for heading in "${headings[@]}"; do
         assert_contains "$heading" "$readme" "README contains project section '$heading'"
     done
-    assert_not_contains 'README.zh.md' "$readme" 'single-language README has no alternate-language link'
-    assert_not_contains 'Reliable backups' "$readme" 'project introduction is written in Chinese'
+    assert_contains '[简体中文](README.zh.md)' "$readme" 'English README links to Chinese documentation'
+    assert_contains '[English](README.md)' "$(<"$PROJECT_DIR/README.zh.md")" 'Chinese README links to English documentation'
+    assert_contains '## 安全模型' "$(<"$PROJECT_DIR/README.zh.md")" 'Chinese README retains safety documentation'
     assert_contains 'SyncWarden 公开示例配置' "$example" 'public example has a Chinese title'
     assert_not_contains 'SyncWarden Public Example Configuration' "$example" 'public example removes the English title'
     assert_contains '## 运行测试' "$test_readme" 'test documentation has a Chinese run section'
@@ -738,7 +739,7 @@ run_parser_suite() {
     test_parser_rejects_cross_server_nested_managed_paths
     test_parser_rejects_control_and_system_destinations
     test_public_example_uses_approved_retention_policy
-    test_public_docs_are_chinese_and_project_shaped
+    test_public_docs_are_bilingual_and_project_shaped
 }
 
 run_cli_command() {
