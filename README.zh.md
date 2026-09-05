@@ -338,7 +338,7 @@ SyncWarden 支持 **Bash 5+ 和 GNU/Linux**。macOS 自带的 BSD `date`、`read
 bash tests/run_tests.sh all
 ```
 
-测试分组、隔离边界和覆盖范围见 [`tests/README.md`](tests/README.md)。
+测试分组、隔离边界和覆盖范围见 [`tests/README.zh.md`](tests/README.zh.md)。
 
 ## 常见问题
 

@@ -706,8 +706,9 @@ test_public_docs_are_bilingual_and_project_shaped() {
     assert_contains '## 安全模型' "$(<"$PROJECT_DIR/README.zh.md")" 'Chinese README retains safety documentation'
     assert_contains 'SyncWarden 公开示例配置' "$example" 'public example has a Chinese title'
     assert_not_contains 'SyncWarden Public Example Configuration' "$example" 'public example removes the English title'
-    assert_contains '## 运行测试' "$test_readme" 'test documentation has a Chinese run section'
-    assert_not_contains '# SyncWarden test suite' "$test_readme" 'test documentation removes the English title'
+    assert_contains '## Running tests' "$test_readme" 'test documentation defaults to English'
+    assert_contains '[简体中文](README.zh.md)' "$test_readme" 'test documentation links to Chinese'
+    assert_contains '[English](README.md)' "$(<"$PROJECT_DIR/tests/README.zh.md")" 'Chinese test documentation links to English'
 }
 
 run_parser_suite() {
