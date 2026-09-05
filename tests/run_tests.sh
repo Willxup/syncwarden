@@ -9,6 +9,8 @@ set -uo pipefail
 
 # Keep date formatting deterministic and avoid inheriting the host timezone.
 export TZ=UTC
+# Tests choose presentation languages explicitly instead of inheriting the caller.
+export SYNCWARDEN_LANG=en
 
 TEST_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 PROJECT_DIR=$(cd -- "$TEST_DIR/.." && pwd -P)
@@ -760,7 +762,7 @@ test_help_is_concise_and_has_no_side_effects() {
     assert_eq '0' "$short_rc" '-h returns zero without a config'
     assert_eq '0' "$long_rc" '--help returns zero without a config'
     assert_eq "$short" "$long" 'short and long help are identical'
-    assert_contains '用法' "$long" 'help presents command usage'
+    assert_contains 'Usage:' "$long" 'help presents command usage'
     assert_contains 'syncwarden.sh sample-server' "$long" 'help shows a manual synchronization example'
     assert_contains 'syncwarden.sh sample-server --dry-run' "$long" 'help shows a dry-run example'
     assert_contains 'syncwarden.sh --archive SERVER_ID' "$long" 'help lists archive-only mode'
@@ -772,10 +774,10 @@ test_help_is_concise_and_has_no_side_effects() {
     assert_contains "$tmp/missing.conf" "$long" 'help displays the active configuration path'
     assert_not_contains 'known_hosts' "$long" 'help leaves SSH host-key details in the README'
     assert_not_contains '05h00m00s' "$long" 'help leaves timeout details in the README'
-    assert_not_contains '退出码' "$long" 'help leaves exit-code details in the README'
+    assert_not_contains 'Exit codes' "$long" 'help leaves exit-code details in the README'
     assert_not_contains 'success-YYYY-MM.log' "$long" 'help leaves log-layout details in the README'
-    assert_not_contains '服务器配置要点' "$long" 'help leaves configuration rules in the README'
-    assert_not_contains 'dry-run 边界' "$long" 'help leaves dry-run boundaries in the README'
+    assert_not_contains 'Server configuration' "$long" 'help leaves configuration rules in the README'
+    assert_not_contains 'Dry-run boundaries' "$long" 'help leaves dry-run boundaries in the README'
     assert_not_contains '/opt/syncwarden' "$long" 'help contains no fixed deployment control path'
     line_count=$(printf '%s\n' "$long" | wc -l)
     if (( line_count <= 40 )); then
@@ -2776,7 +2778,7 @@ test_global_timeout_constants_and_single_wrapper() {
     assert_contains 'ARG=--help' "$content" 'global wrapper preserves original CLI arguments'
     assert_contains 'SyncWarden -' "$output" 'wrapped help still reaches the normal command dispatcher'
     assert_not_contains '05h00m00s' "$output" 'CLI help leaves the global runtime details in the README'
-    assert_not_contains '退出码' "$output" 'CLI help leaves exit-code documentation in the README'
+    assert_not_contains 'Exit codes' "$output" 'CLI help leaves exit-code documentation in the README'
 }
 
 test_manual_global_timeout_logs_and_cleans_up() {
@@ -3455,6 +3457,39 @@ run_log_suite() {
     FIND_BIN=$(command -v find)
 }
 
+test_language_selection_and_help_are_read_only() {
+    local tmp language output default_help rc
+    tmp=$(make_temp_dir)
+    default_help=$(env -u SYNCWARDEN_LANG LANG=zh_CN.UTF-8 SYNCWARDEN_LIB_MODE=0 \
+        SYNCWARDEN_HOME="$tmp/home" SYNCWARDEN_CONFIG="$tmp/missing.conf" "$SCRIPT_PATH" --help)
+    assert_contains 'Usage:' "$default_help" 'help defaults to English even under a Chinese host locale'
+    for language in en '' fr invalid; do
+        output=$(SYNCWARDEN_LANG="$language" SYNCWARDEN_LIB_MODE=0 SYNCWARDEN_HOME="$tmp/home" \
+            SYNCWARDEN_CONFIG="$tmp/missing.conf" "$SCRIPT_PATH" --help)
+        rc=$?
+        assert_eq '0' "$rc" "English fallback '$language' preserves help exit status"
+        assert_eq "$default_help" "$output" "language '$language' uses English help"
+    done
+    for language in zh zh-CN zh_CN zh_CN.UTF-8 zh_CN.utf8; do
+        output=$(SYNCWARDEN_LANG="$language" SYNCWARDEN_LIB_MODE=0 SYNCWARDEN_HOME="$tmp/home" \
+            SYNCWARDEN_CONFIG="$tmp/missing.conf" "$SCRIPT_PATH" --help)
+        rc=$?
+        assert_eq '0' "$rc" "Chinese alias '$language' preserves help exit status"
+        assert_contains '用法：' "$output" "Chinese alias '$language' selects Chinese help"
+        assert_contains 'README.zh.md' "$output" 'Chinese help links to Chinese documentation'
+    done
+    output=$(SYNCWARDEN_LANG=zh SYNCWARDEN_LIB_MODE=0 SYNCWARDEN_HOME="$tmp/home" \
+        SYNCWARDEN_CONFIG="$tmp/missing.conf" "$SCRIPT_PATH" 2>&1)
+    rc=$?
+    assert_eq '64' "$rc" 'Chinese no-argument usage preserves exit code 64'
+    assert_contains '用法：' "$output" 'brief usage supports Chinese'
+    assert_file_not_exists "$tmp/home" 'language selection and help create no control directory'
+}
+
+run_i18n_suite() {
+    test_language_selection_and_help_are_read_only
+}
+
 if [[ ! -r "$SCRIPT_PATH" ]]; then
     printf 'FAIL: production script is missing: %s\n' "$SCRIPT_PATH" >&2
     exit 1
@@ -3467,6 +3502,7 @@ source "$SCRIPT_PATH"
 case "$CURRENT_SUITE" in
     parser) run_parser_suite ;;
     cli) run_cli_suite ;;
+    i18n) run_i18n_suite ;;
     retention) run_retention_suite ;;
     archive) run_archive_suite ;;
     transport) run_transport_suite ;;
@@ -3476,6 +3512,7 @@ case "$CURRENT_SUITE" in
     all)
         run_parser_suite
         run_cli_suite
+        run_i18n_suite
         run_retention_suite
         run_archive_suite
         run_transport_suite

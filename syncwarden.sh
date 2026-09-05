@@ -1,7 +1,30 @@
 #!/usr/bin/env bash
 
+# Only explicit selection changes the presentation language. Host locales do not.
+# Keep this bootstrap compatible with older Bash so the version error is readable.
+use_chinese() {
+    case "${SYNCWARDEN_LANG:-en}" in
+        zh|zh-CN|zh_CN|zh_CN.UTF-8|zh_CN.utf8) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Translate constant format strings only; user data is always passed as arguments.
+# Internal values and persisted records never pass through this function.
+ui_printf() {
+    local format=$1
+    shift
+    if use_chinese; then
+        case "$format" in
+            'SyncWarden requires Bash 5 or newer; found %s.\n') format='SyncWarden 需要 Bash 5 或更高版本；当前版本为 %s。\n' ;;
+            'Usage:\n') format='用法：\n' ;;
+        esac
+    fi
+    printf -- "$format" "$@"
+}
+
 if (( BASH_VERSINFO[0] < 5 )); then
-    printf 'SyncWarden requires Bash 5 or newer; found %s.\n' "$BASH_VERSION" >&2
+    ui_printf 'SyncWarden requires Bash 5 or newer; found %s.\n' "$BASH_VERSION" >&2
     return 69 2>/dev/null || exit 69
 fi
 
@@ -721,8 +744,8 @@ load_main_config() {
 }
 
 print_brief_usage() {
+    ui_printf 'Usage:\n'
     cat <<'USAGE'
-用法：
   syncwarden.sh SERVER_ID
   syncwarden.sh SERVER_ID --dry-run
   syncwarden.sh --help
@@ -730,34 +753,29 @@ USAGE
 }
 
 print_usage() {
-    cat <<USAGE
+    if use_chinese; then
+        cat <<USAGE
 SyncWarden - 带同步前 ZIP 归档保护的远程镜像备份工具
 
 配置文件：$CONFIG_FILE
+语言：SYNCWARDEN_LANG=en|zh（默认 en）
 
 用法：
   syncwarden.sh SERVER_ID
       同步指定服务器。
-
   syncwarden.sh SERVER_ID --dry-run
       预览同步变化，不修改镜像或创建 ZIP。
-
   syncwarden.sh --archive SERVER_ID
       只归档现有本地镜像，不执行同步。
-
   syncwarden.sh --scheduled
       执行到期的定时同步，供 cron 调用。
-
   syncwarden.sh --check
   syncwarden.sh --check --show-resolved
       检查配置；第二条命令同时显示最终解析结果。
-
   syncwarden.sh --list
       列出已配置的服务器。
-
   syncwarden.sh --status SERVER_ID
       查看服务器最近一次运行状态。
-
   syncwarden.sh --help
       显示帮助。
 
@@ -769,8 +787,45 @@ SyncWarden - 带同步前 ZIP 归档保护的远程镜像备份工具
   syncwarden.sh --archive sample-server
   syncwarden.sh --check --show-resolved
 
-完整配置、安全说明和运行细节请查看项目 README.md。
+完整配置、安全说明和运行细节：README.zh.md（中文）、README.md（English）。
 USAGE
+    else
+        cat <<USAGE
+SyncWarden - Remote mirror backups with pre-sync ZIP protection
+
+Configuration file: $CONFIG_FILE
+Language: SYNCWARDEN_LANG=en|zh (default: en)
+
+Usage:
+  syncwarden.sh SERVER_ID
+      Synchronize the specified server.
+  syncwarden.sh SERVER_ID --dry-run
+      Preview changes without modifying mirrors or creating ZIPs.
+  syncwarden.sh --archive SERVER_ID
+      Archive existing local mirrors without synchronization.
+  syncwarden.sh --scheduled
+      Run due scheduled synchronizations, for use with cron.
+  syncwarden.sh --check
+  syncwarden.sh --check --show-resolved
+      Check configuration; the second command also shows effective values.
+  syncwarden.sh --list
+      List configured servers.
+  syncwarden.sh --status SERVER_ID
+      Show the server's latest recorded status.
+  syncwarden.sh --help
+      Show help.
+
+Short options: -n, -a, -s, -c, -r, -l, -t, -h
+
+Examples:
+  syncwarden.sh sample-server
+  syncwarden.sh sample-server --dry-run
+  syncwarden.sh --archive sample-server
+  syncwarden.sh --check --show-resolved
+
+Full configuration, safety, and operation details: README.md; 中文：README.zh.md.
+USAGE
+    fi
 }
 
 print_server_list() {
