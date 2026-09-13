@@ -40,6 +40,58 @@ ui_printf() {
             'SyncWarden global runtime limit exceeded: %s; mode=%s; reason=GLOBAL_TIMEOUT\n') format='SyncWarden 已超过全局运行时限：%s；模式=%s；原因=GLOBAL_TIMEOUT\n' ;;
             SCHEDULED) format='定时同步' ;;
             NAME) format='名称' ;;
+            'configuration error: %s\n') format='配置错误：%s\n' ;;
+            'config file is not readable: %s') format='配置文件不可读：%s' ;;
+            "line %s: invalid server ID '%s'") format="第 %s 行：服务器 ID 无效：'%s'" ;;
+            "line %s: duplicate server section '%s'") format="第 %s 行：服务器分节重复：'%s'" ;;
+            "line %s: unknown section '%s'") format="第 %s 行：未知分节：'%s'" ;;
+            'line %s: key/value appears before a section') format='第 %s 行：键值出现在分节之前' ;;
+            'line %s: expected key=value') format='第 %s 行：应使用 key=value 格式' ;;
+            "line %s: invalid key '%s'") format="第 %s 行：配置键无效：'%s'" ;;
+            "line %s: unknown key '%s' in [%s]") format="第 %s 行：未知配置键 '%s'，所在分节 [%s]" ;;
+            "line %s: duplicate key '%s'") format="第 %s 行：配置键重复：'%s'" ;;
+            "server '%s': source must not be empty") format="服务器 '%s'：source 不能为空" ;;
+            "server '%s': remote source must be absolute: '%s'") format="服务器 '%s'：远程 source 必须是绝对路径：'%s'" ;;
+            "server '%s': remote source must not be root") format="服务器 '%s'：远程 source 不能是根目录" ;;
+            "server '%s': remote source must not end with '/': '%s'") format="服务器 '%s'：远程 source 不能以 '/' 结尾：'%s'" ;;
+            "server '%s': remote source contains an unsafe path component: '%s'") format="服务器 '%s'：远程 source 包含不安全的路径组件：'%s'" ;;
+            "server '%s': remote source contains an unsupported character: '%s'") format="服务器 '%s'：远程 source 包含不支持的字符：'%s'" ;;
+            "server '%s': remote source derives invalid local name '%s'") format="服务器 '%s'：远程 source 生成的本地名称无效：'%s'" ;;
+            "missing required key '%s' in [global]") format="[global] 缺少必需配置键 '%s'" ;;
+            "missing required key '%s' in [defaults]") format="[defaults] 缺少必需配置键 '%s'" ;;
+            'no server sections configured') format='未配置任何服务器分节' ;;
+            "cannot canonicalize SyncWarden home '%s'") format="无法规范化 SyncWarden 控制目录 '%s'" ;;
+            'sync_hours is empty') format='sync_hours 不能为空' ;;
+            "invalid decimal sync hour '%s'") format="同步小时不是有效十进制小时：'%s'" ;;
+            "duplicate sync hour '%s'") format="同步小时重复：'%s'" ;;
+            "invalid positive decimal integer for 'log_retention_months': '%s'") format="log_retention_months 必须为正十进制整数：'%s'" ;;
+            "server '%s': missing required host") format="服务器 '%s'：缺少必需配置 host" ;;
+            "server '%s': invalid port '%s'") format="服务器 '%s'：端口无效：'%s'" ;;
+            "server '%s': 'scheduled_sync_enabled' must be yes or no") format="服务器 '%s'：scheduled_sync_enabled 必须为 yes 或 no" ;;
+            "server '%s': '%s' must be a positive decimal integer") format="服务器 '%s'：'%s' 必须为正十进制整数" ;;
+            "server '%s': retry_count must be a nonnegative decimal integer") format="服务器 '%s'：retry_count 必须为非负十进制整数" ;;
+            "server '%s': retry delays count is shorter than retry_count") format="服务器 '%s'：重试等待时间的数量少于 retry_count" ;;
+            "server '%s': retry delays must be nonnegative decimal integers") format="服务器 '%s'：重试等待时间必须为非负十进制整数" ;;
+            "server '%s': key_file must be absolute") format="服务器 '%s'：key_file 必须为绝对路径" ;;
+            "server '%s': owner must use USER:GROUP") format="服务器 '%s'：owner 必须使用 USER:GROUP 格式" ;;
+            "server '%s': missing required destination") format="服务器 '%s'：缺少必需配置 destination" ;;
+            "server '%s': invalid destination '%s'") format="服务器 '%s'：destination 无效：'%s'" ;;
+            "server '%s': destination contains a control character or index delimiter") format="服务器 '%s'：destination 包含控制字符或索引分隔符" ;;
+            "server '%s': cannot canonicalize destination '%s'") format="服务器 '%s'：无法规范化 destination：'%s'" ;;
+            "server '%s': canonical destination must not be root") format="服务器 '%s'：规范化后的 destination 不能是根目录" ;;
+            "server '%s': destination must not be directly below root: '%s'") format="服务器 '%s'：destination 不能直接位于根目录下：'%s'" ;;
+            "server '%s': destination parent must already exist as a real directory: '%s'") format="服务器 '%s'：destination 的父目录必须已存在且为真实目录：'%s'" ;;
+            "server '%s': unsafe managed path '%s'") format="服务器 '%s'：受管路径不安全：'%s'" ;;
+            "server '%s': destination contains a symbolic-link component: '%s'") format="服务器 '%s'：destination 包含符号链接组件：'%s'" ;;
+            "server '%s': destination exists but is not a directory: '%s'") format="服务器 '%s'：destination 已存在但不是目录：'%s'" ;;
+            "server '%s': missing required source") format="服务器 '%s'：缺少必需配置 source" ;;
+            "server '%s': duplicate local source name '%s'") format="服务器 '%s'：本地 source 名称重复：'%s'" ;;
+            "server '%s': cannot canonicalize target '%s'") format="服务器 '%s'：无法规范化目标：'%s'" ;;
+            "server '%s': target escapes canonical destination: '%s'") format="服务器 '%s'：目标超出规范化后的 destination：'%s'" ;;
+            "server '%s': target contains a symbolic-link component: '%s'") format="服务器 '%s'：目标包含符号链接组件：'%s'" ;;
+            "server '%s': target exists but is not a directory: '%s'") format="服务器 '%s'：目标已存在但不是目录：'%s'" ;;
+            "duplicate resolved target '%s' for servers '%s' and '%s'") format="解析后的目标 '%s' 重复，涉及服务器 '%s' 和 '%s'" ;;
+            "managed path overlap: server '%s' %s '%s' and server '%s' %s '%s'") format="受管路径重叠：服务器 '%s' 的 %s '%s' 与服务器 '%s' 的 %s '%s'" ;;
         esac
     fi
     printf -- "$format" "$@"
@@ -148,8 +200,10 @@ trim() {
 }
 
 config_error() {
-    [[ -n "$LAST_CONFIG_ERROR" ]] || LAST_CONFIG_ERROR=$1
-    printf 'configuration error: %s\n' "$1" >&2
+    local message
+    printf -v message -- "$@"
+    [[ -n "$LAST_CONFIG_ERROR" ]] || LAST_CONFIG_ERROR=$message
+    ui_printf 'configuration error: %s\n' "$(ui_printf "$@")" >&2
     return 1
 }
 
@@ -201,7 +255,7 @@ load_config() {
 
     reset_config
 
-    [[ -r "$file" ]] || config_error "config file is not readable: $file" || return 1
+    [[ -r "$file" ]] || config_error 'config file is not readable: %s' "$file" || return 1
 
     while IFS= read -r raw || [[ -n "$raw" ]]; do
         line_number=$((line_number + 1))
@@ -223,11 +277,11 @@ load_config() {
                 server:*)
                     server_id=${BASH_REMATCH[1]#server:}
                     [[ "$server_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
-                        config_error "line $line_number: invalid server ID '$server_id'"
+                        config_error "line %s: invalid server ID '%s'" "$line_number" "$server_id"
                         return 1
                     }
                     [[ -z "${SEEN_SERVER_SECTIONS[$server_id]+x}" ]] || {
-                        config_error "line $line_number: duplicate server section '$server_id'"
+                        config_error "line %s: duplicate server section '%s'" "$line_number" "$server_id"
                         return 1
                     }
                     SEEN_SERVER_SECTIONS[$server_id]=1
@@ -236,7 +290,7 @@ load_config() {
                     section='server'
                     ;;
                 *)
-                    config_error "line $line_number: unknown section '${BASH_REMATCH[1]}'"
+                    config_error "line %s: unknown section '%s'" "$line_number" "${BASH_REMATCH[1]}"
                     return 1
                     ;;
             esac
@@ -244,22 +298,22 @@ load_config() {
         fi
 
         [[ -n "$section" ]] || {
-            config_error "line $line_number: key/value appears before a section"
+            config_error 'line %s: key/value appears before a section' "$line_number"
             return 1
         }
         [[ "$line" == *=* ]] || {
-            config_error "line $line_number: expected key=value"
+            config_error 'line %s: expected key=value' "$line_number"
             return 1
         }
 
         key=$(trim "${line%%=*}")
         value=$(trim "${line#*=}")
         [[ "$key" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] || {
-            config_error "line $line_number: invalid key '$key'"
+            config_error "line %s: invalid key '%s'" "$line_number" "$key"
             return 1
         }
         is_allowed_key "$section" "$key" || {
-            config_error "line $line_number: unknown key '$key' in [$section]"
+            config_error "line %s: unknown key '%s' in [%s]" "$line_number" "$key" "$section"
             return 1
         }
 
@@ -270,7 +324,7 @@ load_config() {
         fi
 
         if [[ "$key" != 'source' && -n "${SEEN_KEYS[$seen_key]+x}" ]]; then
-            config_error "line $line_number: duplicate key '$key'"
+            config_error "line %s: duplicate key '%s'" "$line_number" "$key"
             return 1
         fi
         SEEN_KEYS[$seen_key]=1
@@ -373,39 +427,39 @@ validate_source_spec() {
     local -a components=()
 
     [[ -n "$remote" ]] || {
-        config_error "server '$server_id': source must not be empty"
+        config_error "server '%s': source must not be empty" "$server_id"
         return 1
     }
     [[ "$remote" == /* ]] || {
-        config_error "server '$server_id': remote source must be absolute: '$remote'"
+        config_error "server '%s': remote source must be absolute: '%s'" "$server_id" "$remote"
         return 1
     }
     [[ "$remote" != '/' ]] || {
-        config_error "server '$server_id': remote source must not be root"
+        config_error "server '%s': remote source must not be root" "$server_id"
         return 1
     }
     [[ "$remote" != */ ]] || {
-        config_error "server '$server_id': remote source must not end with '/': '$remote'"
+        config_error "server '%s': remote source must not end with '/': '%s'" "$server_id" "$remote"
         return 1
     }
     [[ "$remote" != *//* ]] || {
-        config_error "server '$server_id': remote source contains an unsafe path component: '$remote'"
+        config_error "server '%s': remote source contains an unsafe path component: '%s'" "$server_id" "$remote"
         return 1
     }
     [[ "$remote" =~ ^/[A-Za-z0-9._/-]+$ ]] || {
-        config_error "server '$server_id': remote source contains an unsupported character: '$remote'"
+        config_error "server '%s': remote source contains an unsupported character: '%s'" "$server_id" "$remote"
         return 1
     }
     IFS='/' read -r -a components <<<"${remote#/}"
     for component in "${components[@]}"; do
         [[ -n "$component" && "$component" != '.' && "$component" != '..' ]] || {
-            config_error "server '$server_id': remote source contains an unsafe path component: '$remote'"
+            config_error "server '%s': remote source contains an unsafe path component: '%s'" "$server_id" "$remote"
             return 1
         }
     done
     local_name=$(source_local_name "$remote") || return 1
     [[ "$local_name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && "$local_name" != '.' && "$local_name" != '..' ]] || {
-        config_error "server '$server_id': remote source derives invalid local name '$local_name'"
+        config_error "server '%s': remote source derives invalid local name '%s'" "$server_id" "$local_name"
         return 1
     }
 }
@@ -421,13 +475,13 @@ validate_required_config() {
 
     for key in "${global_keys[@]}"; do
         [[ -n "${GLOBAL[$key]+x}" && -n "${GLOBAL[$key]}" ]] || {
-            config_error "missing required key '$key' in [global]"
+            config_error "missing required key '%s' in [global]" "$key"
             return 1
         }
     done
     for key in "${default_keys[@]}"; do
         [[ -n "${DEFAULTS[$key]+x}" && -n "${DEFAULTS[$key]}" ]] || {
-            config_error "missing required key '$key' in [defaults]"
+            config_error "missing required key '%s' in [defaults]" "$key"
             return 1
         }
     done
@@ -447,7 +501,7 @@ validate_config() {
     }
 
     canonical_home=$(canonical_path "$SYNCWARDEN_HOME") || {
-        config_error "cannot canonicalize SyncWarden home '$SYNCWARDEN_HOME'"
+        config_error "cannot canonicalize SyncWarden home '%s'" "$SYNCWARDEN_HOME"
         return 1
     }
 
@@ -459,114 +513,114 @@ validate_config() {
     for hour in "${hours[@]}"; do
         hour=$(trim "$hour")
         is_nonnegative_integer "$hour" && (( 10#$hour <= 23 )) || {
-            config_error "invalid decimal sync hour '$hour'"
+            config_error "invalid decimal sync hour '%s'" "$hour"
             return 1
         }
         [[ -z "${seen_hours[$hour]+x}" ]] || {
-            config_error "duplicate sync hour '$hour'"
+            config_error "duplicate sync hour '%s'" "$hour"
             return 1
         }
         seen_hours[$hour]=1
     done
 
     is_positive_integer "${GLOBAL[log_retention_months]}" || {
-        config_error "invalid positive decimal integer for 'log_retention_months': '${GLOBAL[log_retention_months]}'"
+        config_error "invalid positive decimal integer for 'log_retention_months': '%s'" "${GLOBAL[log_retention_months]}"
         return 1
     }
 
     for id in "${SERVER_IDS[@]}"; do
         host=$(resolve_value "$id" host)
         [[ -n "$host" ]] || {
-            config_error "server '$id': missing required host"
+            config_error "server '%s': missing required host" "$id"
             return 1
         }
 
         port=$(resolve_value "$id" port)
         [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) || {
-            config_error "server '$id': invalid port '$port'"
+            config_error "server '%s': invalid port '%s'" "$id" "$port"
             return 1
         }
 
         value=$(resolve_value "$id" scheduled_sync_enabled)
         is_yes_no "$value" || {
-            config_error "server '$id': 'scheduled_sync_enabled' must be yes or no"
+            config_error "server '%s': 'scheduled_sync_enabled' must be yes or no" "$id"
             return 1
         }
 
         for key in rsync_timeout_seconds archive_recent_keep archive_monthly_keep min_free_space_mb min_free_inodes; do
             value=$(resolve_value "$id" "$key")
             is_positive_integer "$value" || {
-                config_error "server '$id': '$key' must be a positive decimal integer"
+                config_error "server '%s': '%s' must be a positive decimal integer" "$id" "$key"
                 return 1
             }
         done
         retry_count=$(resolve_value "$id" retry_count)
         is_nonnegative_integer "$retry_count" || {
-            config_error "server '$id': retry_count must be a nonnegative decimal integer"
+            config_error "server '%s': retry_count must be a nonnegative decimal integer" "$id"
             return 1
         }
         delay_string=$(resolve_value "$id" retry_delays_seconds)
         IFS=',' read -r -a delays <<<"$delay_string"
         if (( ${#delays[@]} < retry_count )); then
-            config_error "server '$id': retry delays count is shorter than retry_count"
+            config_error "server '%s': retry delays count is shorter than retry_count" "$id"
             return 1
         fi
         for value in "${delays[@]}"; do
             value=$(trim "$value")
             is_nonnegative_integer "$value" || {
-                config_error "server '$id': retry delays must be nonnegative decimal integers"
+                config_error "server '%s': retry delays must be nonnegative decimal integers" "$id"
                 return 1
             }
         done
 
         [[ "$(resolve_value "$id" key_file)" == /* ]] || {
-            config_error "server '$id': key_file must be absolute"
+            config_error "server '%s': key_file must be absolute" "$id"
             return 1
         }
         [[ "$(resolve_value "$id" owner)" == *:* ]] || {
-            config_error "server '$id': owner must use USER:GROUP"
+            config_error "server '%s': owner must use USER:GROUP" "$id"
             return 1
         }
 
         destination=$(resolved_destination "$id")
         [[ -n "$destination" ]] || {
-            config_error "server '$id': missing required destination"
+            config_error "server '%s': missing required destination" "$id"
             return 1
         }
         [[ "$destination" == /* && "$destination" != '/' ]] || {
-            config_error "server '$id': invalid destination '$destination'"
+            config_error "server '%s': invalid destination '%s'" "$id" "$destination"
             return 1
         }
         [[ "$destination" != *[[:cntrl:]\|]* ]] || {
-            config_error "server '$id': destination contains a control character or index delimiter"
+            config_error "server '%s': destination contains a control character or index delimiter" "$id"
             return 1
         }
         canonical_destination=$(canonical_path "$destination") || {
-            config_error "server '$id': cannot canonicalize destination '$destination'"
+            config_error "server '%s': cannot canonicalize destination '%s'" "$id" "$destination"
             return 1
         }
         [[ "$canonical_destination" != '/' ]] || {
-            config_error "server '$id': canonical destination must not be root"
+            config_error "server '%s': canonical destination must not be root" "$id"
             return 1
         }
         [[ "$(dirname -- "$canonical_destination")" != '/' ]] || {
-            config_error "server '$id': destination must not be directly below root: '$destination'"
+            config_error "server '%s': destination must not be directly below root: '%s'" "$id" "$destination"
             return 1
         }
         [[ -d "$(dirname -- "$canonical_destination")" && ! -L "$(dirname -- "$canonical_destination")" ]] || {
-            config_error "server '$id': destination parent must already exist as a real directory: '$(dirname -- "$canonical_destination")'"
+            config_error "server '%s': destination parent must already exist as a real directory: '%s'" "$id" "$(dirname -- "$canonical_destination")"
             return 1
         }
         if path_in_protected_tree "$canonical_destination" || paths_overlap "$canonical_destination" "$canonical_home"; then
-            config_error "server '$id': unsafe managed path '$canonical_destination'"
+            config_error "server '%s': unsafe managed path '%s'" "$id" "$canonical_destination"
             return 1
         fi
         if path_has_symlink_component "$destination"; then
-            config_error "server '$id': destination contains a symbolic-link component: '$destination'"
+            config_error "server '%s': destination contains a symbolic-link component: '%s'" "$id" "$destination"
             return 1
         fi
         if [[ -e "$destination" && ! -d "$destination" ]]; then
-            config_error "server '$id': destination exists but is not a directory: '$destination'"
+            config_error "server '%s': destination exists but is not a directory: '%s'" "$id" "$destination"
             return 1
         fi
         managed_paths+=("$canonical_destination")
@@ -576,7 +630,7 @@ validate_config() {
         sources=()
         get_server_sources "$id" sources
         (( ${#sources[@]} > 0 )) || {
-            config_error "server '$id': missing required source"
+            config_error "server '%s': missing required source" "$id"
             return 1
         }
         local_names=()
@@ -585,33 +639,33 @@ validate_config() {
             remote=$spec
             local_name=$(source_local_name "$remote") || return 1
             [[ -z "${local_names[$local_name]+x}" ]] || {
-                config_error "server '$id': duplicate local source name '$local_name'"
+                config_error "server '%s': duplicate local source name '%s'" "$id" "$local_name"
                 return 1
             }
             local_names[$local_name]=1
             target="${destination%/}/$local_name"
             canonical_target=$(canonical_path "$target") || {
-                config_error "server '$id': cannot canonicalize target '$target'"
+                config_error "server '%s': cannot canonicalize target '%s'" "$id" "$target"
                 return 1
             }
             [[ "$(dirname -- "$canonical_target")" == "$canonical_destination" ]] || {
-                config_error "server '$id': target escapes canonical destination: '$target'"
+                config_error "server '%s': target escapes canonical destination: '%s'" "$id" "$target"
                 return 1
             }
             if path_in_protected_tree "$canonical_target" || paths_overlap "$canonical_target" "$canonical_home"; then
-                config_error "server '$id': unsafe managed path '$canonical_target'"
+                config_error "server '%s': unsafe managed path '%s'" "$id" "$canonical_target"
                 return 1
             fi
             if path_has_symlink_component "$target"; then
-                config_error "server '$id': target contains a symbolic-link component: '$target'"
+                config_error "server '%s': target contains a symbolic-link component: '%s'" "$id" "$target"
                 return 1
             fi
             if [[ -e "$target" && ! -d "$target" ]]; then
-                config_error "server '$id': target exists but is not a directory: '$target'"
+                config_error "server '%s': target exists but is not a directory: '%s'" "$id" "$target"
                 return 1
             fi
             [[ -z "${resolved_targets[$canonical_target]+x}" ]] || {
-                config_error "duplicate resolved target '$canonical_target' for servers '${resolved_targets[$canonical_target]}' and '$id'"
+                config_error "duplicate resolved target '%s' for servers '%s' and '%s'" "$canonical_target" "${resolved_targets[$canonical_target]}" "$id"
                 return 1
             }
             resolved_targets[$canonical_target]=$id
@@ -625,7 +679,7 @@ validate_config() {
         for ((other_index = index + 1; other_index < ${#managed_paths[@]}; other_index++)); do
             [[ "${managed_ids[$index]}" != "${managed_ids[$other_index]}" ]] || continue
             if paths_overlap "${managed_paths[$index]}" "${managed_paths[$other_index]}"; then
-                config_error "managed path overlap: server '${managed_ids[$index]}' ${managed_kinds[$index]} '${managed_paths[$index]}' and server '${managed_ids[$other_index]}' ${managed_kinds[$other_index]} '${managed_paths[$other_index]}'"
+                config_error "managed path overlap: server '%s' %s '%s' and server '%s' %s '%s'" "${managed_ids[$index]}" "${managed_kinds[$index]}" "${managed_paths[$index]}" "${managed_ids[$other_index]}" "${managed_kinds[$other_index]}" "${managed_paths[$other_index]}"
                 return 1
             fi
         done

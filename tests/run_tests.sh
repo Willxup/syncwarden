@@ -3519,9 +3519,43 @@ test_localized_cli_keeps_arguments_and_query_data() {
     assert_eq '未知选项：%s\\n$(touch should-not-exist)' "$output" 'message data is printed literally, never interpreted as format or shell code'
 }
 
+test_localized_configuration_errors_preserve_canonical_reason() {
+    local tmp language expected_reason='' rc english_reason SYNCWARDEN_LANG
+    tmp=$(make_temp_dir)
+    for language in en zh; do
+        SYNCWARDEN_LANG=$language
+        load_config "$tmp/missing-%s.conf" >"$tmp/$language.out" 2>&1
+        rc=$?
+        assert_eq '1' "$rc" 'unreadable configuration fails in either language'
+        if [[ "$language" == en ]]; then
+            expected_reason=$LAST_CONFIG_ERROR
+        else
+            assert_eq "$expected_reason" "$LAST_CONFIG_ERROR" 'stored configuration reason remains canonical English'
+            assert_contains '配置文件不可读' "$(<"$tmp/zh.out")" 'configuration error details are translated'
+            assert_contains 'missing-%s.conf' "$(<"$tmp/zh.out")" 'percent signs in paths remain literal'
+        fi
+    done
+    printf '[unexpected]\n' >"$tmp/invalid.conf"
+    SYNCWARDEN_LANG=en load_config "$tmp/invalid.conf" >"$tmp/en.out" 2>&1
+    english_reason=$LAST_CONFIG_ERROR
+    SYNCWARDEN_LANG=zh load_config "$tmp/invalid.conf" >"$tmp/zh.out" 2>&1
+    assert_eq "$english_reason" "$LAST_CONFIG_ERROR" 'parser section errors retain the same stored reason'
+    assert_contains "第 1 行：未知分节：'unexpected'" "$(<"$tmp/zh.out")" 'parser keeps line number and section data in Chinese'
+    load_config "$FIXTURE_DIR/base.conf"
+    SERVER_VALUES['sample-server:source']='relative'
+    SERVER_SOURCES['sample-server:0']='relative'
+    SYNCWARDEN_LANG=en validate_config >"$tmp/en.out" 2>&1
+    english_reason=$LAST_CONFIG_ERROR
+    LAST_CONFIG_ERROR=''
+    SYNCWARDEN_LANG=zh validate_config >"$tmp/zh.out" 2>&1
+    assert_eq "$english_reason" "$LAST_CONFIG_ERROR" 'validation retains the same stored reason'
+    assert_contains '远程 source 必须是绝对路径' "$(<"$tmp/zh.out")" 'path validation details are translated'
+}
+
 run_i18n_suite() {
     test_language_selection_and_help_are_read_only
     test_localized_cli_keeps_arguments_and_query_data
+    test_localized_configuration_errors_preserve_canonical_reason
 }
 
 if [[ ! -r "$SCRIPT_PATH" ]]; then
