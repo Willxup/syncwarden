@@ -3486,8 +3486,42 @@ test_language_selection_and_help_are_read_only() {
     assert_file_not_exists "$tmp/home" 'language selection and help create no control directory'
 }
 
+test_localized_cli_keeps_arguments_and_query_data() {
+    local tmp output english chinese rc args
+    local -a command_args=()
+    tmp=$(make_temp_dir)
+    for args in '--help extra' '--dry-run' '--show-resolved' '--check unexpected' '--list extra' '--status' '--unknown'; do
+        # All entries above are fixed test tokens, never user input.
+        read -r -a command_args <<<"$args"
+        english=$(SYNCWARDEN_LANG=en run_cli_command "$tmp/home" "${command_args[@]}" 2>&1)
+        rc=$?
+        assert_eq '64' "$rc" "English usage error keeps exit code: $args"
+        chinese=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" "${command_args[@]}" 2>&1)
+        rc=$?
+        assert_eq '64' "$rc" "Chinese usage error keeps exit code: $args"
+        if [[ "$english" != "$chinese" ]]; then
+            pass "usage error is translated: $args"
+        else
+            fail "usage error must be translated: $args"
+        fi
+    done
+    english=$(SYNCWARDEN_LANG=en run_cli_command "$tmp/home" --check --show-resolved)
+    chinese=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" --check --show-resolved)
+    assert_contains '配置检查通过' "$chinese" 'check success is translated'
+    assert_eq "${english#*$'\n'}" "${chinese#*$'\n'}" 'resolved configuration stays identical across languages'
+    output=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" --list)
+    assert_contains '定时同步' "$output" 'server list header is translated'
+    assert_contains 'Sample-Server' "$output" 'server display name is preserved'
+    output=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" --status sample-server)
+    assert_contains '尚无状态记录' "$output" 'missing status message is translated'
+    assert_file_not_exists "$tmp/home" 'translated queries and usage errors do not initialize runtime files'
+    output=$(SYNCWARDEN_LANG=zh ui_printf 'unknown option: %s\n' '%s\\n$(touch should-not-exist)')
+    assert_eq '未知选项：%s\\n$(touch should-not-exist)' "$output" 'message data is printed literally, never interpreted as format or shell code'
+}
+
 run_i18n_suite() {
     test_language_selection_and_help_are_read_only
+    test_localized_cli_keeps_arguments_and_query_data
 }
 
 if [[ ! -r "$SCRIPT_PATH" ]]; then

@@ -18,6 +18,28 @@ ui_printf() {
         case "$format" in
             'SyncWarden requires Bash 5 or newer; found %s.\n') format='SyncWarden 需要 Bash 5 或更高版本；当前版本为 %s。\n' ;;
             'Usage:\n') format='用法：\n' ;;
+            'help does not accept additional arguments\n') format='帮助命令不接受额外参数\n' ;;
+            'dry-run requires a configured SERVER_ID before %s\n') format='执行 dry-run 时，必须在 %s 前指定已配置的 SERVER_ID\n' ;;
+            '%s is only valid after -c or --check\n') format='%s 仅能用于 -c 或 --check 之后\n' ;;
+            'too many arguments for check\n') format='配置检查的参数过多\n' ;;
+            'unknown check option: %s\n') format='未知的配置检查选项：%s\n' ;;
+            'SyncWarden configuration OK: %d server(s)\n') format='SyncWarden 配置检查通过：%d 台服务器\n' ;;
+            '%s does not accept additional arguments\n') format='%s 不接受额外参数\n' ;;
+            'usage: syncwarden.sh %s SERVER_ID\n') format='用法：syncwarden.sh %s SERVER_ID\n' ;;
+            'unknown server ID: %s\n') format='未知的服务器 ID：%s\n' ;;
+            'No SyncWarden task is due at this hour.\n') format='当前小时没有到期的 SyncWarden 任务。\n' ;;
+            'This SyncWarden schedule slot is already completed: %s\n') format='此 SyncWarden 调度时段已完成：%s\n' ;;
+            'No servers are configured for scheduled synchronization.\n') format='没有配置参与定时同步的服务器。\n' ;;
+            'unknown option: %s\n') format='未知选项：%s\n' ;;
+            'unknown argument for server %s: %s\n') format='服务器 %s 的参数未知：%s\n' ;;
+            'too many arguments\n') format='参数过多\n' ;;
+            '%s: no recorded status\n') format='%s：尚无状态记录\n' ;;
+            'Status for %s:\n') format='%s 的状态：\n' ;;
+            'SyncWarden is already running (lock: %s)\n') format='SyncWarden 已在运行（锁文件：%s）\n' ;;
+            'required command not found: timeout\n') format='未找到必需命令：timeout\n' ;;
+            'SyncWarden global runtime limit exceeded: %s; mode=%s; reason=GLOBAL_TIMEOUT\n') format='SyncWarden 已超过全局运行时限：%s；模式=%s；原因=GLOBAL_TIMEOUT\n' ;;
+            SCHEDULED) format='定时同步' ;;
+            NAME) format='名称' ;;
         esac
     fi
     printf -- "$format" "$@"
@@ -830,7 +852,7 @@ USAGE
 
 print_server_list() {
     local id
-    printf '%-20s %-18s %s\n' 'ID' 'SCHEDULED' 'NAME'
+    printf '%-20s %-18s %s\n' 'ID' "$(ui_printf 'SCHEDULED')" "$(ui_printf 'NAME')"
     for id in "${SERVER_IDS[@]}"; do
         printf '%-20s %-18s %s\n' "$id" "$(resolve_value "$id" scheduled_sync_enabled)" "$(resolve_value "$id" name)"
     done
@@ -860,10 +882,10 @@ print_status() {
     local id=$1
     local status_file="$LAST_STATUS_DIR/$id.status"
     if [[ ! -f "$status_file" ]]; then
-        printf '%s: no recorded status\n' "$id"
+        ui_printf '%s: no recorded status\n' "$id"
         return 0
     fi
-    printf 'Status for %s:\n' "$id"
+    ui_printf 'Status for %s:\n' "$id"
     sed 's/^/  /' "$status_file"
 }
 
@@ -2590,7 +2612,7 @@ write_schedule_state() {
 acquire_lock() {
     exec {SYNCWARDEN_LOCK_FD}>"$LOCK_FILE" || return 1
     if ! flock -n "$SYNCWARDEN_LOCK_FD"; then
-        printf 'SyncWarden is already running (lock: %s)\n' "$LOCK_FILE" >&2
+        ui_printf 'SyncWarden is already running (lock: %s)\n' "$LOCK_FILE" >&2
         return 75
     fi
 }
@@ -2700,18 +2722,18 @@ main() {
     case "$first" in
         -h|--help)
             [[ -z "${2-}" ]] || {
-                printf 'help does not accept additional arguments\n' >&2
+                ui_printf 'help does not accept additional arguments\n' >&2
                 return 64
             }
             print_usage
             return 0
             ;;
         -n|--dry-run)
-            printf 'dry-run requires a configured SERVER_ID before %s\n' "$first" >&2
+            ui_printf 'dry-run requires a configured SERVER_ID before %s\n' "$first" >&2
             return 64
             ;;
         -r|--show-resolved)
-            printf '%s is only valid after -c or --check\n' "$first" >&2
+            ui_printf '%s is only valid after -c or --check\n' "$first" >&2
             return 64
             ;;
     esac
@@ -2720,17 +2742,17 @@ main() {
         -c|--check)
             if [[ "${2-}" == '-r' || "${2-}" == '--show-resolved' ]]; then
                 [[ -z "${3-}" ]] || {
-                    printf 'too many arguments for check\n' >&2
+                    ui_printf 'too many arguments for check\n' >&2
                     return 64
                 }
             elif [[ -n "${2-}" ]]; then
-                printf 'unknown check option: %s\n' "$2" >&2
+                ui_printf 'unknown check option: %s\n' "$2" >&2
                 return 64
             fi
             load_main_config || return 1
             check_dependencies || return 1
             check_private_keys "${SERVER_IDS[@]}" || return 1
-            printf 'SyncWarden configuration OK: %d server(s)\n' "${#SERVER_IDS[@]}"
+            ui_printf 'SyncWarden configuration OK: %d server(s)\n' "${#SERVER_IDS[@]}"
             if [[ "${2-}" == '-r' || "${2-}" == '--show-resolved' ]]; then
                 print_resolved_config
             fi
@@ -2738,7 +2760,7 @@ main() {
             ;;
         -l|--list)
             [[ -z "${2-}" ]] || {
-                printf '%s does not accept additional arguments\n' "$first" >&2
+                ui_printf '%s does not accept additional arguments\n' "$first" >&2
                 return 64
             }
             load_main_config || return 1
@@ -2747,12 +2769,12 @@ main() {
             ;;
         -t|--status)
             [[ -n "${2-}" && -z "${3-}" ]] || {
-                printf 'usage: syncwarden.sh %s SERVER_ID\n' "$first" >&2
+                ui_printf 'usage: syncwarden.sh %s SERVER_ID\n' "$first" >&2
                 return 64
             }
             load_main_config || return 1
             server_exists "$2" || {
-                printf 'unknown server ID: %s\n' "$2" >&2
+                ui_printf 'unknown server ID: %s\n' "$2" >&2
                 return 64
             }
             print_status "$2"
@@ -2760,7 +2782,7 @@ main() {
             ;;
         -s|--scheduled)
             [[ -z "${2-}" ]] || {
-                printf '%s does not accept additional arguments\n' "$first" >&2
+                ui_printf '%s does not accept additional arguments\n' "$first" >&2
                 return 64
             }
             load_runtime_config_or_log SCHEDULED || return 1
@@ -2774,18 +2796,18 @@ main() {
             scheduled_epoch=${SYNCWARDEN_NOW_EPOCH:-$(wall_now_epoch)}
             scheduled_hour=$(current_schedule_hour) || return 1
             if ! scheduled_due_now "$scheduled_hour"; then
-                printf 'No SyncWarden task is due at this hour.\n'
+                ui_printf 'No SyncWarden task is due at this hour.\n'
                 return 0
             fi
             scheduled_path=$(schedule_state_path "$scheduled_epoch" "$scheduled_hour") || return 1
             if schedule_slot_already_recorded "$scheduled_path"; then
-                printf 'This SyncWarden schedule slot is already completed: %s\n' "$scheduled_path"
+                ui_printf 'This SyncWarden schedule slot is already completed: %s\n' "$scheduled_path"
                 return 0
             fi
             local -a scheduled_ids=()
             scheduled_server_ids scheduled_ids
             (( ${#scheduled_ids[@]} > 0 )) || {
-                printf 'No servers are configured for scheduled synchronization.\n'
+                ui_printf 'No servers are configured for scheduled synchronization.\n'
                 return 0
             }
             local scheduled_rc scheduled_status
@@ -2801,12 +2823,12 @@ main() {
             ;;
         -a|--archive)
             [[ -n "${2-}" && -z "${3-}" ]] || {
-                printf 'usage: syncwarden.sh %s SERVER_ID\n' "$first" >&2
+                ui_printf 'usage: syncwarden.sh %s SERVER_ID\n' "$first" >&2
                 return 64
             }
             load_runtime_config_or_log ARCHIVE_ONLY || return 1
             server_exists "$2" || {
-                printf 'unknown server ID: %s\n' "$2" >&2
+                ui_printf 'unknown server ID: %s\n' "$2" >&2
                 return 64
             }
             check_dependencies || return 1
@@ -2820,17 +2842,17 @@ main() {
             return $?
             ;;
         -*)
-            printf 'unknown option: %s\n' "$first" >&2
+            ui_printf 'unknown option: %s\n' "$first" >&2
             print_brief_usage >&2
             return 64
             ;;
         *)
             if [[ -n "${2-}" && "${2-}" != '-n' && "${2-}" != '--dry-run' ]]; then
-                printf 'unknown argument for server %s: %s\n' "$first" "$2" >&2
+                ui_printf 'unknown argument for server %s: %s\n' "$first" "$2" >&2
                 return 64
             fi
             [[ -z "${3-}" ]] || {
-                printf 'too many arguments\n' >&2
+                ui_printf 'too many arguments\n' >&2
                 return 64
             }
             local manual_lock_rc dry_run=0 manual_mode='MANUAL'
@@ -2842,7 +2864,7 @@ main() {
                 load_runtime_config_or_log MANUAL || return 1
             fi
             server_exists "$first" || {
-                printf 'unknown server ID: %s\n' "$first" >&2
+                ui_printf 'unknown server ID: %s\n' "$first" >&2
                 return 64
             }
             check_dependencies || return 1
@@ -2918,7 +2940,7 @@ run_with_global_timeout() {
     fi
 
     if ! command -v "$TIMEOUT_BIN" >/dev/null 2>&1; then
-        printf 'required command not found: timeout\n' >&2
+        ui_printf 'required command not found: timeout\n' >&2
         return 1
     fi
 
@@ -2934,7 +2956,7 @@ run_with_global_timeout() {
     rc=$?
 
     if (( rc == 124 )); then
-        printf 'SyncWarden global runtime limit exceeded: %s; mode=%s; reason=GLOBAL_TIMEOUT\n' \
+        ui_printf 'SyncWarden global runtime limit exceeded: %s; mode=%s; reason=GLOBAL_TIMEOUT\n' \
             "$(format_global_runtime_limit)" "$mode" >&2
         if mode_persists_global_timeout "$mode"; then
             persist_global_timeout "$mode" "$run_id" || :
