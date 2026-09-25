@@ -3587,11 +3587,60 @@ test_localized_runtime_guards_keep_failure_semantics() {
     assert_contains '私钥错误' "$(<"$tmp/key.out")" 'private key guard is translated'
 }
 
+test_localized_summaries_preserve_persisted_records() {
+    local tmp language rc content
+    tmp=$(make_temp_dir)
+    for language in en zh; do
+        (
+            export SYNCWARDEN_LANG=$language SYNCWARDEN_RUN_ID=language-regression
+            export SYNCWARDEN_NOW_EPOCH=1783846800
+            timestamp_now() { printf '%s\n' '2026-07-12 09:00:00 +00:00'; }
+            wall_now_epoch() { printf '%s\n' '1783846800'; }
+            transfer_timer_now_us() { printf '%s\n' '1000000'; }
+            mkdir -p "$tmp/$language/payload/one/data"
+            write_orchestration_config "$tmp/$language/config" "$tmp/$language/payload"
+            prepare_orchestration_test "$tmp/$language/home" "$tmp/$language/config"
+            SERVER_VALUES['one:name']='Time: 原始名称 %s'
+            export FAKE_SSH_MODE=success FAKE_RSYNC_MODE=vanished
+            unset FAKE_SSH_FAIL_HOST FAKE_RSYNC_FAIL_HOST FAKE_RSYNC_MODE_SEQUENCE
+            export FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++|1024'
+            run_batch MANUAL 0 one >"$tmp/$language/output"
+        )
+        rc=$?
+        assert_eq '0' "$rc" "code 24 retains successful batch semantics in $language"
+        assert_file_not_exists "$tmp/$language/home/logs/failure-2026-07.log" 'code 24 creates no failure log in either language'
+    done
+    assert_contains 'SUMMARY' "$(<"$tmp/en/output")" 'English summary keeps original presentation'
+    content=$(<"$tmp/zh/output")
+    assert_contains '汇总' "$content" 'Chinese batch summary is translated'
+    assert_contains '传输量=' "$content" 'Chinese server result labels are translated'
+    assert_contains 'Time: 原始名称 %s' "$content" 'translated summaries preserve arbitrary display names'
+    assert_eq "$(<"$tmp/en/home/logs/success-2026-07.log")" "$(<"$tmp/zh/home/logs/success-2026-07.log")" 'persisted success logs are byte-identical across languages with fixed clocks'
+    assert_eq "$(<"$tmp/en/home/state/last-status/one.status")" "$(<"$tmp/zh/home/state/last-status/one.status")" 'persisted state is byte-identical across languages with fixed clocks'
+    (
+        export SYNCWARDEN_LANG=zh
+        write_orchestration_config "$tmp/dry-config" "$tmp/zh/payload"
+        export FAKE_SSH_MODE=host-key FAKE_RSYNC_MODE=success
+        unset FAKE_SSH_FAIL_HOST FAKE_RSYNC_FAIL_HOST
+        run_integration_cli "$tmp/dry-home" "$tmp/dry-config" one --dry-run >"$tmp/dry-output" 2>&1
+    )
+    rc=$?
+    assert_eq '1' "$rc" 'translated dry-run failure keeps its exit status'
+    content=$(<"$tmp/dry-output")
+    assert_contains '失败 - One' "$content" 'dry-run failure title is translated'
+    assert_contains '原始输出' "$content" 'dry-run raw-output heading is translated'
+    assert_contains 'HOST_KEY_CHANGED' "$content" 'failure reason codes remain stable'
+    assert_contains 'REMOTE HOST IDENTIFICATION HAS CHANGED' "$content" 'external SSH diagnostics remain verbatim'
+    assert_file_not_exists "$tmp/dry-home/logs/failure-2026-07.log" 'translated dry-run writes no failure log'
+    assert_file_not_exists "$tmp/dry-home/state/last-status/one.status" 'translated dry-run writes no status'
+}
+
 run_i18n_suite() {
     test_language_selection_and_help_are_read_only
     test_localized_cli_keeps_arguments_and_query_data
     test_localized_configuration_errors_preserve_canonical_reason
     test_localized_runtime_guards_keep_failure_semantics
+    test_localized_summaries_preserve_persisted_records
 }
 
 if [[ ! -r "$SCRIPT_PATH" ]]; then

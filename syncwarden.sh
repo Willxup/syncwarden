@@ -136,6 +136,31 @@ ui_printf() {
             'rotated-log discovery failed; maintenance skipped') format='轮转日志扫描失败，已跳过维护' ;;
             'failed to remove expired managed log: %s') format='无法删除过期受管日志：%s' ;;
             'failed to remove expired compressed log: %s') format='无法删除过期压缩日志：%s' ;;
+            'DRY RUN CHANGES - %s / %s\n') format='预演变化 - %s / %s\n' ;;
+            '  (no changes)\n') format='  （无变化）\n' ;;
+            'WARNING - %s') format='警告 - %s' ;;
+            'FAILURE - %s') format='失败 - %s' ;;
+            '  Time       : %s\n  Run ID     : %s\n  Mode       : %s\n  Server     : %s\n  ID         : %s') format='  时间       : %s\n  运行 ID    : %s\n  模式       : %s\n  服务器     : %s\n  ID         : %s' ;;
+            '\n  Source          : %s') format='\n  数据源          : %s' ;;
+            '\n  Stage      : %s\n  Reason     : %s\n  Exit Code  : %s\n  Stage Attempts  : %s') format='\n  阶段       : %s\n  原因       : %s\n  退出码     : %s\n  阶段尝试次数    : %s' ;;
+            '\n--------------------------------------------------------------------------------\nRAW OUTPUT\n%s') format='\n--------------------------------------------------------------------------------\n原始输出\n%s' ;;
+            '  Changes         : %s\n') format='  变化总数        : %s\n' ;;
+            '  Created         : %s\n') format='  新增            : %s\n' ;;
+            '  Updated         : %s\n') format='  更新            : %s\n' ;;
+            '  Deleted         : %s\n') format='  删除            : %s\n' ;;
+            '  Transferred     : %s\n') format='  传输量          : %s\n' ;;
+            '  Average Speed   : %s\n') format='  平均速度        : %s\n' ;;
+            '  Rsync Attempts  : %s\n') format='  rsync 尝试次数  : %s\n' ;;
+            '  Change Complete : %s\n') format='  变化统计完成    : %s\n' ;;
+            '[OK] %-20s archive=%-20s sync=%-8s duration=%s') format='[完成] %-20s 归档=%-20s 同步=%-8s 耗时=%s' ;;
+            '[OK] %-20s archive=%-20s sync=%-8s transferred=%s avg_speed=%s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s') format='[完成] %-20s 归档=%-20s 同步=%-8s 传输量=%s 平均速度=%s 变化=%s 新增=%s 更新=%s 删除=%s 尝试次数=%s 完成=%s 耗时=%s' ;;
+            '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable') format='[完成] %-20s 数据源=%-20s 归档=%s 变化=not_applicable 新增=not_applicable 更新=not_applicable 删除=not_applicable 尝试次数=0 完成=not_applicable' ;;
+            '  Time     : %s\n  Run ID   : %s\n  Mode     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Success  : %d\n  Warning  : %d\n  Failed   : %d\n  Duration : %s') format='  时间     : %s\n  运行 ID  : %s\n  模式     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\n汇总\n  成功     : %d\n  警告     : %d\n  失败     : %d\n  耗时     : %s' ;;
+            '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s') format='  时间     : %s\n  运行 ID  : %s\n  模式     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\n汇总\n  状态     : %s\n  耗时     : %s' ;;
+            '\n  Log Maintenance : WARNING') format='\n  日志维护        : WARNING' ;;
+            '\n  Final Status : FAILED\n  Reason       : LOG_WRITE_FAILED') format='\n  最终状态     : FAILED\n  原因         : LOG_WRITE_FAILED' ;;
+            '\n  Log Maintenance : WARNING\n  Final Status    : %s') format='\n  日志维护        : WARNING\n  最终状态        : %s' ;;
+            '\n  Final Status : %s\n  Reason       : %s') format='\n  最终状态     : %s\n  原因         : %s' ;;
         esac
     fi
     printf -- "$format" "$@"
@@ -198,6 +223,8 @@ FIND_BIN=${SYNCWARDEN_FIND_BIN:-$(command -v find 2>/dev/null || printf 'find')}
 SORT_BIN=${SYNCWARDEN_SORT_BIN:-$(command -v sort 2>/dev/null || printf 'sort')}
 LOG_MAINTENANCE_MESSAGES=''
 FAILURE_BODY_RESULT=''
+FAILURE_DISPLAY_RESULT=''
+SERVER_FAILURE_DISPLAY_BODY=''
 
 # Fixed safety limits for individual external commands. Only rsync's
 # continuous no-I/O timeout belongs to the user configuration contract.
@@ -1941,11 +1968,11 @@ sync_source() {
             (( dry_run == 1 )) || LAST_CHANGE_COMPLETE='yes'
             if (( dry_run == 1 )); then
                 printf '%s\n' '--------------------------------------------------------------------------------'
-                printf 'DRY RUN CHANGES - %s / %s\n' "$(resolve_value "$id" name)" "$local_name"
+                ui_printf 'DRY RUN CHANGES - %s / %s\n' "$(resolve_value "$id" name)" "$local_name"
                 if [[ -s "$output_file" ]]; then
                     sed 's/^/  /' "$output_file"
                 else
-                    printf '%s\n' '  (no changes)'
+                    ui_printf '  (no changes)\n'
                 fi
                 printf '%s\n' '--------------------------------------------------------------------------------'
             fi
@@ -2108,25 +2135,27 @@ server_average_speed_display() {
 }
 
 render_server_change_summary() {
+    local printer=${1:-printf}
     local changes created updated deleted
     changes=$(server_change_value "$SERVER_CHANGE_COUNT")
     created=$(server_change_value "$SERVER_CHANGE_CREATED")
     updated=$(server_change_value "$SERVER_CHANGE_UPDATED")
     deleted=$(server_change_value "$SERVER_CHANGE_DELETED")
     [[ "$SERVER_CHANGE_STATE" == 'parse_failed' ]] && changes='unavailable (parse failed)'
-    printf '  Changes         : %s\n' "$changes"
-    printf '  Created         : %s\n' "$created"
-    printf '  Updated         : %s\n' "$updated"
-    printf '  Deleted         : %s\n' "$deleted"
-    printf '  Transferred     : %s\n' "$(server_transfer_size_display)"
-    printf '  Average Speed   : %s\n' "$(server_average_speed_display)"
-    printf '  Rsync Attempts  : %s\n' "$SERVER_CHANGE_ATTEMPTS"
-    printf '  Change Complete : %s\n' "$SERVER_CHANGE_COMPLETE"
+    "$printer" '  Changes         : %s\n' "$changes"
+    "$printer" '  Created         : %s\n' "$created"
+    "$printer" '  Updated         : %s\n' "$updated"
+    "$printer" '  Deleted         : %s\n' "$deleted"
+    "$printer" '  Transferred     : %s\n' "$(server_transfer_size_display)"
+    "$printer" '  Average Speed   : %s\n' "$(server_average_speed_display)"
+    "$printer" '  Rsync Attempts  : %s\n' "$SERVER_CHANGE_ATTEMPTS"
+    "$printer" '  Change Complete : %s\n' "$SERVER_CHANGE_COMPLETE"
 }
 
 attach_server_change_summary() {
     (( SERVER_CHANGE_SUMMARY_ATTACHED == 0 )) || return 0
     SERVER_FAILURE_BODY+="${SERVER_FAILURE_BODY:+$'\n'}$(render_server_change_summary)"
+    SERVER_FAILURE_DISPLAY_BODY+="${SERVER_FAILURE_DISPLAY_BODY:+$'\n'}$(render_server_change_summary ui_printf)"
     SERVER_CHANGE_SUMMARY_ATTACHED=1
 }
 
@@ -2206,6 +2235,7 @@ persist_server_status() {
     build_failure_body "$id" "$mode" 'STATE' 'STATE_WRITE_FAILED' 1 1 ''
     body=$FAILURE_BODY_RESULT
     SERVER_FAILURE_BODY+="${SERVER_FAILURE_BODY:+$'\n'}$body"
+    SERVER_FAILURE_DISPLAY_BODY+="${SERVER_FAILURE_DISPLAY_BODY:+$'\n'}$FAILURE_DISPLAY_RESULT"
     attach_server_change_summary
     SERVER_STATUS='FAILED'
     SERVER_REASON='STATE_WRITE_FAILED'
@@ -2221,23 +2251,30 @@ build_failure_body() {
     local attempts=$6
     local output_path=${7-}
     local source_name=${8-}
-    local name raw='' body
+    local name raw='' time
     name=$(resolve_value "$id" name)
     if [[ -n "$output_path" && -f "$output_path" ]]; then
         raw=$(sed 's/^/  /' "$output_path")
         discard_temp_file "$output_path"
     fi
-    printf -v body '  Time       : %s\n  Run ID     : %s\n  Mode       : %s\n  Server     : %s\n  ID         : %s' \
-        "$(timestamp_now)" "${RUN_ID:-none}" "$mode" "$name" "$id"
+    time=$(timestamp_now)
+    FAILURE_BODY_RESULT=$(render_failure_body printf "$time" "${RUN_ID:-none}" "$mode" "$name" "$id" "$source_name" "$stage" "$reason" "$exit_code" "$attempts" "$raw")
+    FAILURE_DISPLAY_RESULT=$(render_failure_body ui_printf "$time" "${RUN_ID:-none}" "$mode" "$name" "$id" "$source_name" "$stage" "$reason" "$exit_code" "$attempts" "$raw")
+}
+
+render_failure_body() {
+    local printer=$1 time=$2 run_id=$3 mode=$4 name=$5 id=$6 source_name=$7
+    local stage=$8 reason=$9 exit_code=${10} attempts=${11} raw=${12}
+    "$printer" '  Time       : %s\n  Run ID     : %s\n  Mode       : %s\n  Server     : %s\n  ID         : %s' \
+        "$time" "$run_id" "$mode" "$name" "$id"
     if [[ -n "$source_name" ]]; then
-        printf -v body '%s\n  Source          : %s' "$body" "$source_name"
+        "$printer" '\n  Source          : %s' "$source_name"
     fi
-    printf -v body '%s\n  Stage      : %s\n  Reason     : %s\n  Exit Code  : %s\n  Stage Attempts  : %s' \
-        "$body" "$stage" "$reason" "$exit_code" "$attempts"
+    "$printer" '\n  Stage      : %s\n  Reason     : %s\n  Exit Code  : %s\n  Stage Attempts  : %s' \
+        "$stage" "$reason" "$exit_code" "$attempts"
     if [[ -n "$raw" ]]; then
-        printf -v body '%s\n--------------------------------------------------------------------------------\nRAW OUTPUT\n%s' "$body" "$raw"
+        "$printer" '\n--------------------------------------------------------------------------------\nRAW OUTPUT\n%s' "$raw"
     fi
-    FAILURE_BODY_RESULT=$body
 }
 
 managed_plain_log_name() {
@@ -2396,17 +2433,37 @@ maintain_monthly_logs() {
     return 0
 }
 
+render_server_result() {
+    local printer=$1 dry_run=$2 name=$3 archive_summary=$4 sync_summary=$5 duration=$6
+    if (( dry_run == 1 )); then
+        "$printer" '[OK] %-20s archive=%-20s sync=%-8s duration=%s' \
+            "$name" "$archive_summary" "$sync_summary" "$(format_duration "$duration")"
+    else
+        "$printer" '[OK] %-20s archive=%-20s sync=%-8s transferred=%s avg_speed=%s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s' \
+            "$name" "$archive_summary" "$sync_summary" \
+            "$(server_transfer_size_display)" \
+            "$(server_average_speed_display)" \
+            "$(server_change_value "$SERVER_CHANGE_COUNT")" \
+            "$(server_change_value "$SERVER_CHANGE_CREATED")" \
+            "$(server_change_value "$SERVER_CHANGE_UPDATED")" \
+            "$(server_change_value "$SERVER_CHANGE_DELETED")" \
+            "$SERVER_CHANGE_ATTEMPTS" "$SERVER_CHANGE_COMPLETE" "$(format_duration "$duration")"
+    fi
+}
+
 run_server() {
     local id=$1
     local mode=$2
     local dry_run=${3:-0}
     local started duration name spec rc server_rc=0 reason='SUCCESS'
-    local archive_summary='NOT_REQUESTED' sync_summary='NOT_RUN' failure_parts=''
+    local archive_summary='NOT_REQUESTED' sync_summary='NOT_RUN' failure_parts='' failure_display_parts=''
     local -a sources=()
 
     SERVER_STATUS=''
     SERVER_RESULT_LINE=''
+    SERVER_RESULT_DISPLAY_LINE=''
     SERVER_FAILURE_BODY=''
+    SERVER_FAILURE_DISPLAY_BODY=''
     SERVER_ARCHIVE_SUMMARY=''
     SERVER_REASON=''
     reset_server_change_stats
@@ -2425,6 +2482,7 @@ run_server() {
         finalize_server_change_stats
         build_failure_body "$id" "$mode" 'PRIVATE_KEY' "$reason" 1 0 ''
         SERVER_FAILURE_BODY=$FAILURE_BODY_RESULT
+        SERVER_FAILURE_DISPLAY_BODY=$FAILURE_DISPLAY_RESULT
         attach_server_change_summary
         SERVER_STATUS='FAILED'
         SERVER_ARCHIVE_SUMMARY='NOT_REQUESTED'
@@ -2443,6 +2501,7 @@ run_server() {
         finalize_server_change_stats
         build_failure_body "$id" "$mode" 'PREFLIGHT' "$reason" "${LAST_EXIT_CODE:-1}" "${LAST_ATTEMPT_COUNT:-1}" "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
         SERVER_FAILURE_BODY=$FAILURE_BODY_RESULT
+        SERVER_FAILURE_DISPLAY_BODY=$FAILURE_DISPLAY_RESULT
         attach_server_change_summary
         SERVER_STATUS='FAILED'
         SERVER_REASON=$reason
@@ -2472,14 +2531,17 @@ run_server() {
                     reason=$LAST_ARCHIVE_STATUS
                     build_failure_body "$id" "$mode" 'ARCHIVE_CLEANUP' "$reason" 2 1 "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
                     failure_parts+="$FAILURE_BODY_RESULT"$'\n'
+                    failure_display_parts+="$FAILURE_DISPLAY_RESULT"$'\n'
                     ;;
                 *)
                     archive_summary=${LAST_ARCHIVE_STATUS:-FAILED_ARCHIVE}
                     reason=$archive_summary
                     build_failure_body "$id" "$mode" 'ARCHIVE' "$reason" 1 1 "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
                     failure_parts+="$FAILURE_BODY_RESULT"$'\n'
+                    failure_display_parts+="$FAILURE_DISPLAY_RESULT"$'\n'
                     SERVER_ARCHIVE_SUMMARY=$archive_summary
                     SERVER_FAILURE_BODY=${failure_parts%$'\n'}
+                    SERVER_FAILURE_DISPLAY_BODY=${failure_display_parts%$'\n'}
                     finalize_server_change_stats
                     attach_server_change_summary
                     SERVER_STATUS='FAILED'
@@ -2509,6 +2571,7 @@ run_server() {
                 fi
                 build_failure_body "$id" "$mode" 'RSYNC' "${LAST_FAILURE_REASON:-FILES_VANISHED}" "${LAST_EXIT_CODE:-24}" "${LAST_ATTEMPT_COUNT:-1}" "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
                 failure_parts+="$FAILURE_BODY_RESULT"$'\n'
+                failure_display_parts+="$FAILURE_DISPLAY_RESULT"$'\n'
                 ;;
             *)
                 server_rc=1
@@ -2516,27 +2579,17 @@ run_server() {
                 reason=${LAST_FAILURE_REASON:-RSYNC_FAILED}
                 build_failure_body "$id" "$mode" 'RSYNC' "$reason" "${LAST_EXIT_CODE:-1}" "${LAST_ATTEMPT_COUNT:-1}" "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
                 failure_parts+="$FAILURE_BODY_RESULT"$'\n'
+                failure_display_parts+="$FAILURE_DISPLAY_RESULT"$'\n'
                 ;;
         esac
     done
 
     finalize_server_change_stats
     duration=$(( $(wall_now_epoch) - started ))
-    if (( dry_run == 1 )); then
-        SERVER_RESULT_LINE=$(printf '[OK] %-20s archive=%-20s sync=%-8s duration=%s' \
-            "$name" "$archive_summary" "$sync_summary" "$(format_duration "$duration")")
-    else
-        SERVER_RESULT_LINE=$(printf '[OK] %-20s archive=%-20s sync=%-8s transferred=%s avg_speed=%s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s' \
-            "$name" "$archive_summary" "$sync_summary" \
-            "$(server_transfer_size_display)" \
-            "$(server_average_speed_display)" \
-            "$(server_change_value "$SERVER_CHANGE_COUNT")" \
-            "$(server_change_value "$SERVER_CHANGE_CREATED")" \
-            "$(server_change_value "$SERVER_CHANGE_UPDATED")" \
-            "$(server_change_value "$SERVER_CHANGE_DELETED")" \
-            "$SERVER_CHANGE_ATTEMPTS" "$SERVER_CHANGE_COMPLETE" "$(format_duration "$duration")")
-    fi
+    SERVER_RESULT_LINE=$(render_server_result printf "$dry_run" "$name" "$archive_summary" "$sync_summary" "$duration")
+    SERVER_RESULT_DISPLAY_LINE=$(render_server_result ui_printf "$dry_run" "$name" "$archive_summary" "$sync_summary" "$duration")
     SERVER_FAILURE_BODY=${failure_parts%$'\n'}
+    SERVER_FAILURE_DISPLAY_BODY=${failure_display_parts%$'\n'}
     [[ -z "$SERVER_FAILURE_BODY" ]] || attach_server_change_summary
 
     case "$server_rc" in
@@ -2572,7 +2625,7 @@ run_batch() {
     local dry_run=$2
     shift 2
     local started duration id rc success_count=0 warning_count=0 failed_count=0 overall=0
-    local success_lines='' summary_body failure_title persistence_failed=0
+    local success_lines='' success_display_lines='' summary_body summary_display_body summary_time failure_title failure_display_title persistence_failed=0
     local run_log_epoch='' maintenance_rc maintenance_body
     local -a persisted_ids=()
 
@@ -2594,33 +2647,39 @@ run_batch() {
             0)
                 success_count=$((success_count + 1))
                 success_lines+="$SERVER_RESULT_LINE"$'\n'
+                success_display_lines+="$SERVER_RESULT_DISPLAY_LINE"$'\n'
                 ;;
             2)
                 warning_count=$((warning_count + 1))
                 (( overall == 0 )) && overall=2
                 failure_title="WARNING - $(resolve_value "$id" name)"
+                failure_display_title=$(ui_printf 'WARNING - %s' "$(resolve_value "$id" name)")
                 if (( dry_run == 0 )); then
                     append_log_block "$FAILURE_LOG" "$failure_title" "$SERVER_FAILURE_BODY" || persistence_failed=1
                 else
-                    render_log_block "$failure_title" "$SERVER_FAILURE_BODY"
+                    render_log_block "$failure_display_title" "$SERVER_FAILURE_DISPLAY_BODY"
                 fi
                 ;;
             *)
                 failed_count=$((failed_count + 1))
                 overall=1
                 failure_title="FAILURE - $(resolve_value "$id" name)"
+                failure_display_title=$(ui_printf 'FAILURE - %s' "$(resolve_value "$id" name)")
                 if (( dry_run == 0 )); then
                     append_log_block "$FAILURE_LOG" "$failure_title" "$SERVER_FAILURE_BODY" || persistence_failed=1
                 else
-                    render_log_block "$failure_title" "$SERVER_FAILURE_BODY"
+                    render_log_block "$failure_display_title" "$SERVER_FAILURE_DISPLAY_BODY"
                 fi
                 ;;
         esac
     done
 
     duration=$(( $(wall_now_epoch) - started ))
+    summary_time=$(timestamp_now)
     summary_body=$(printf '  Time     : %s\n  Run ID   : %s\n  Mode     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Success  : %d\n  Warning  : %d\n  Failed   : %d\n  Duration : %s' \
-        "$(timestamp_now)" "$RUN_ID" "$mode" "$success_lines" "$success_count" "$warning_count" "$failed_count" "$(format_duration "$duration")")
+        "$summary_time" "$RUN_ID" "$mode" "$success_lines" "$success_count" "$warning_count" "$failed_count" "$(format_duration "$duration")")
+    summary_display_body=$(ui_printf '  Time     : %s\n  Run ID   : %s\n  Mode     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Success  : %d\n  Warning  : %d\n  Failed   : %d\n  Duration : %s' \
+        "$summary_time" "$RUN_ID" "$mode" "$success_display_lines" "$success_count" "$warning_count" "$failed_count" "$(format_duration "$duration")")
 
     if (( dry_run == 0 )); then
         append_log_block "$SUCCESS_LOG" 'RUN START' "$summary_body" || persistence_failed=1
@@ -2632,6 +2691,7 @@ run_batch() {
             append_log_block "$FAILURE_LOG" 'WARNING - LOG MAINTENANCE' "$maintenance_body" || persistence_failed=1
             (( overall == 0 )) && overall=2
             summary_body+=$'\n  Log Maintenance : WARNING'
+            summary_display_body+=$(ui_printf '\n  Log Maintenance : WARNING')
         fi
     fi
     if (( persistence_failed != 0 )); then
@@ -2642,9 +2702,10 @@ run_batch() {
             done
         fi
         summary_body+=$'\n  Final Status : FAILED\n  Reason       : LOG_WRITE_FAILED'
+        summary_display_body+=$(ui_printf '\n  Final Status : FAILED\n  Reason       : LOG_WRITE_FAILED')
     fi
 
-    printf '%s\n' "$summary_body"
+    printf '%s\n' "$summary_display_body"
 
     return "$overall"
 }
@@ -2729,7 +2790,7 @@ scheduled_server_ids() {
 run_archive_only() {
     local id=$1
     local started spec local_name rc overall=0 duration name status='SUCCESS' reason='SUCCESS'
-    local success_lines='' failure_body='' title summary_body persistence_failed=0
+    local success_lines='' success_display_lines='' failure_body='' title summary_body summary_display_body summary_time persistence_failed=0
     local maintenance_rc maintenance_body run_log_epoch
     local -a sources=()
     RUN_ID=${SYNCWARDEN_RUN_ID:-$(new_run_id)}
@@ -2748,6 +2809,7 @@ run_archive_only() {
         case "$rc" in
             0)
                 success_lines+="$(printf '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable' "$name" "$local_name" "$LAST_ARCHIVE_STATUS")"$'\n'
+                success_display_lines+="$(ui_printf '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable' "$name" "$local_name" "$LAST_ARCHIVE_STATUS")"$'\n'
                 ;;
             2)
                 if (( overall == 0 )); then
@@ -2769,8 +2831,11 @@ run_archive_only() {
     done
 
     duration=$(( $(wall_now_epoch) - started ))
+    summary_time=$(timestamp_now)
     summary_body=$(printf '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s' \
-        "$(timestamp_now)" "$RUN_ID" "$success_lines" "$status" "$(format_duration "$duration")")
+        "$summary_time" "$RUN_ID" "$success_lines" "$status" "$(format_duration "$duration")")
+    summary_display_body=$(ui_printf '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s' \
+        "$summary_time" "$RUN_ID" "$success_display_lines" "$status" "$(format_duration "$duration")")
     append_log_block "$SUCCESS_LOG" 'ARCHIVE ONLY' "$summary_body" || persistence_failed=1
     if [[ -n "$failure_body" ]]; then
         failure_body=${failure_body%$'\n'}
@@ -2790,6 +2855,7 @@ run_archive_only() {
             reason='LOG_MAINTENANCE_WARNING'
         fi
         summary_body+=$(printf '\n  Log Maintenance : WARNING\n  Final Status    : %s' "$status")
+        summary_display_body+=$(ui_printf '\n  Log Maintenance : WARNING\n  Final Status    : %s' "$status")
     fi
     if (( persistence_failed != 0 )); then
         overall=1
@@ -2804,8 +2870,9 @@ run_archive_only() {
     fi
     if (( persistence_failed != 0 )); then
         summary_body+=$(printf '\n  Final Status : %s\n  Reason       : %s' "$status" "$reason")
+        summary_display_body+=$(ui_printf '\n  Final Status : %s\n  Reason       : %s' "$status" "$reason")
     fi
-    printf '%s\n' "$summary_body"
+    printf '%s\n' "$summary_display_body"
     (( persistence_failed == 0 )) || return 1
     return "$overall"
 }
