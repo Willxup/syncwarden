@@ -154,16 +154,102 @@ ui_printf() {
             '  Change Complete : %s\n') format='  变化统计完成    : %s\n' ;;
             '[OK] %-20s archive=%-20s sync=%-8s duration=%s') format='[完成] %-20s 归档=%-20s 同步=%-8s 耗时=%s' ;;
             '[OK] %-20s archive=%-20s sync=%-8s transferred=%s avg_speed=%s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s') format='[完成] %-20s 归档=%-20s 同步=%-8s 传输量=%s 平均速度=%s 变化=%s 新增=%s 更新=%s 删除=%s 尝试次数=%s 完成=%s 耗时=%s' ;;
-            '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable') format='[完成] %-20s 数据源=%-20s 归档=%s 变化=not_applicable 新增=not_applicable 更新=not_applicable 删除=not_applicable 尝试次数=0 完成=not_applicable' ;;
+            '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable') format='[完成] %-20s 数据源=%-20s 归档=%s 变化=不适用 (not_applicable) 新增=不适用 (not_applicable) 更新=不适用 (not_applicable) 删除=不适用 (not_applicable) 尝试次数=0 完成=不适用 (not_applicable)' ;;
             '  Time     : %s\n  Run ID   : %s\n  Mode     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Success  : %d\n  Warning  : %d\n  Failed   : %d\n  Duration : %s') format='  时间     : %s\n  运行 ID  : %s\n  模式     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\n汇总\n  成功     : %d\n  警告     : %d\n  失败     : %d\n  耗时     : %s' ;;
-            '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s') format='  时间     : %s\n  运行 ID  : %s\n  模式     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\n汇总\n  状态     : %s\n  耗时     : %s' ;;
-            '\n  Log Maintenance : WARNING') format='\n  日志维护        : WARNING' ;;
-            '\n  Final Status : FAILED\n  Reason       : LOG_WRITE_FAILED') format='\n  最终状态     : FAILED\n  原因         : LOG_WRITE_FAILED' ;;
-            '\n  Log Maintenance : WARNING\n  Final Status    : %s') format='\n  日志维护        : WARNING\n  最终状态        : %s' ;;
+            '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s') format='  时间     : %s\n  运行 ID  : %s\n  模式     : 仅归档 (ARCHIVE_ONLY)\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\n汇总\n  状态     : %s\n  耗时     : %s' ;;
+            '\n  Log Maintenance : WARNING') format='\n  日志维护        : 警告 (WARNING)' ;;
+            '\n  Final Status : FAILED\n  Reason       : LOG_WRITE_FAILED') format='\n  最终状态     : 失败 (FAILED)\n  原因         : 日志写入失败 (LOG_WRITE_FAILED)' ;;
+            '\n  Log Maintenance : WARNING\n  Final Status    : %s') format='\n  日志维护        : 警告 (WARNING)\n  最终状态        : %s' ;;
             '\n  Final Status : %s\n  Reason       : %s') format='\n  最终状态     : %s\n  原因         : %s' ;;
         esac
     fi
     printf -- "$format" "$@"
+}
+
+# Explain known machine codes only at display boundaries; preserve unknown data.
+ui_code() {
+    local code=$1 label=''
+    if use_chinese; then
+        case "$code" in
+            'SUCCESS') label='成功' ;;
+            'WARNING') label='警告' ;;
+            'FAILED') label='失败' ;;
+            'MANUAL') label='手动同步' ;;
+            'SCHEDULED') label='定时同步' ;;
+            'DRY_RUN') label='同步预演' ;;
+            'ARCHIVE_ONLY') label='仅归档' ;;
+            'PREFLIGHT') label='远程预检' ;;
+            'PRIVATE_KEY') label='私钥检查' ;;
+            'RSYNC') label='rsync 同步' ;;
+            'ARCHIVE') label='归档' ;;
+            'ARCHIVE_CLEANUP') label='归档清理' ;;
+            'STATE') label='状态写入' ;;
+            'AUTH_FAILED') label='SSH 身份验证失败' ;;
+            'HOST_KEY_CHANGED') label='SSH 主机密钥已变化' ;;
+            'REMOTE_SOURCE_MISSING') label='远程数据源不存在' ;;
+            'NETWORK_TRANSIENT') label='临时网络错误' ;;
+            'RSYNC_FAILED') label='rsync 失败' ;;
+            'RSYNC_IO_TIMEOUT') label='rsync 协议 I/O 超时' ;;
+            'TIMEOUT') label='命令超时' ;;
+            'GLOBAL_TIMEOUT') label='超过全局运行时限' ;;
+            'PRIVATE_KEY_FAILED') label='私钥检查失败' ;;
+            'PREFLIGHT_FAILED') label='远程预检失败' ;;
+            'INVALID_SOURCE') label='数据源无效' ;;
+            'UNSAFE_DESTINATION') label='目标路径不安全' ;;
+            'LOCAL_DESTINATION_FAILED') label='无法创建本地目标目录' ;;
+            'TEMP_OUTPUT_FAILED') label='无法创建临时输出文件' ;;
+            'RETRY_DELAY_FAILED') label='重试等待失败' ;;
+            'CAPACITY_CHECK_FAILED') label='容量检查失败' ;;
+            'CAPACITY_CHECK_TIMEOUT') label='容量检查超时' ;;
+            'LOW_FREE_SPACE') label='可用空间不足' ;;
+            'LOW_FREE_INODES') label='可用 inode 不足' ;;
+            'FAILED_ARCHIVE') label='归档失败' ;;
+            'FAILED_CREATE') label='归档创建失败' ;;
+            'FAILED_VERIFY') label='归档验证失败' ;;
+            'FAILED_CHECKSUM') label='归档校验和计算失败' ;;
+            'FAILED_OWNER') label='归档所有者设置失败' ;;
+            'FAILED_MODE') label='归档权限设置失败' ;;
+            'FAILED_PROMOTE') label='归档提升失败' ;;
+            'FAILED_INDEX') label='归档索引写入失败' ;;
+            'FAILED_TIMEOUT') label='归档操作超时' ;;
+            'FAILED_NAME_COLLISION') label='归档名称冲突' ;;
+            'FAILED_TEMP_OUTPUT') label='归档临时输出创建失败' ;;
+            'FAILED_UNSAFE_DESTINATION') label='归档目标路径不安全' ;;
+            'FAILED_CAPACITY_CHECK') label='归档容量检查失败' ;;
+            'FAILED_CAPACITY_CHECK_FAILED') label='归档容量检查失败' ;;
+            'FAILED_CAPACITY_CHECK_TIMEOUT') label='归档容量检查超时' ;;
+            'FAILED_LOW_FREE_SPACE') label='归档可用空间不足' ;;
+            'FAILED_LOW_FREE_INODES') label='归档可用 inode 不足' ;;
+            'FILES_VANISHED') label='源文件在传输前消失' ;;
+            'CHANGE_STATS_PARSE_FAILED') label='变化统计解析失败' ;;
+            'LOG_MAINTENANCE_WARNING') label='日志维护警告' ;;
+            'LOG_WRITE_FAILED') label='日志写入失败' ;;
+            'STATE_WRITE_FAILED') label='状态写入失败' ;;
+            'WARNING_CLEANUP') label='归档清理警告' ;;
+            'SKIPPED_NO_MIRROR') label='尚无镜像，跳过归档' ;;
+            'DRY_RUN_NO_ARCHIVE') label='预演不创建归档' ;;
+            'NOT_REQUESTED') label='未请求' ;;
+            'NOT_RUN') label='未运行' ;;
+            'yes') label='是' ;;
+            'no') label='否' ;;
+            'not_applicable') label='不适用' ;;
+            'unavailable') label='不可用' ;;
+            'unavailable (parse failed)') label='不可用，解析失败' ;;
+        esac
+    fi
+    if [[ -n "$label" ]]; then
+        printf '%s (%s)' "$label" "$code"
+    else
+        printf '%s' "$code"
+    fi
+}
+
+presentation_value() {
+    if [[ "$1" == ui_printf ]]; then
+        ui_code "$2"
+    else
+        printf '%s' "$2"
+    fi
 }
 
 if (( BASH_VERSINFO[0] < 5 )); then
@@ -1011,7 +1097,41 @@ print_status() {
         return 0
     fi
     ui_printf 'Status for %s:\n' "$id"
-    sed 's/^/  /' "$status_file"
+    if ! use_chinese; then
+        sed 's/^/  /' "$status_file"
+        return $?
+    fi
+    local line key value label
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        key=${line%%=*}
+        value=${line#*=}
+        label=''
+        case "$key" in
+            time) label='时间' ;;
+            status) label='状态' ;;
+            mode) label='模式' ;;
+            reason) label='原因' ;;
+            exit_code) label='退出码' ;;
+            duration_seconds) label='耗时秒数' ;;
+            changes) label='变化总数' ;;
+            created) label='新增' ;;
+            updated) label='更新' ;;
+            deleted) label='删除' ;;
+            transferred_bytes) label='传输字节数' ;;
+            sync_duration_microseconds) label='同步耗时微秒数' ;;
+            average_bytes_per_second) label='平均每秒字节数' ;;
+            attempts) label='尝试次数' ;;
+            change_complete) label='变化统计完成' ;;
+        esac
+        if [[ -n "$label" && "$line" == *=* ]]; then
+            # Time is user-visible data, not an enum; all other known fields are
+            # numeric or machine codes. Unknown values are displayed literally.
+            [[ "$key" == time ]] || value=$(ui_code "$value")
+            printf '  %s (%s): %s\n' "$label" "$key" "$value"
+        else
+            printf '  %s\n' "$line"
+        fi
+    done <"$status_file"
 }
 
 archive_basename() {
@@ -2142,14 +2262,14 @@ render_server_change_summary() {
     updated=$(server_change_value "$SERVER_CHANGE_UPDATED")
     deleted=$(server_change_value "$SERVER_CHANGE_DELETED")
     [[ "$SERVER_CHANGE_STATE" == 'parse_failed' ]] && changes='unavailable (parse failed)'
-    "$printer" '  Changes         : %s\n' "$changes"
-    "$printer" '  Created         : %s\n' "$created"
-    "$printer" '  Updated         : %s\n' "$updated"
-    "$printer" '  Deleted         : %s\n' "$deleted"
-    "$printer" '  Transferred     : %s\n' "$(server_transfer_size_display)"
-    "$printer" '  Average Speed   : %s\n' "$(server_average_speed_display)"
+    "$printer" '  Changes         : %s\n' "$(presentation_value "$printer" "$changes")"
+    "$printer" '  Created         : %s\n' "$(presentation_value "$printer" "$created")"
+    "$printer" '  Updated         : %s\n' "$(presentation_value "$printer" "$updated")"
+    "$printer" '  Deleted         : %s\n' "$(presentation_value "$printer" "$deleted")"
+    "$printer" '  Transferred     : %s\n' "$(presentation_value "$printer" "$(server_transfer_size_display)")"
+    "$printer" '  Average Speed   : %s\n' "$(presentation_value "$printer" "$(server_average_speed_display)")"
     "$printer" '  Rsync Attempts  : %s\n' "$SERVER_CHANGE_ATTEMPTS"
-    "$printer" '  Change Complete : %s\n' "$SERVER_CHANGE_COMPLETE"
+    "$printer" '  Change Complete : %s\n' "$(presentation_value "$printer" "$SERVER_CHANGE_COMPLETE")"
 }
 
 attach_server_change_summary() {
@@ -2266,12 +2386,12 @@ render_failure_body() {
     local printer=$1 time=$2 run_id=$3 mode=$4 name=$5 id=$6 source_name=$7
     local stage=$8 reason=$9 exit_code=${10} attempts=${11} raw=${12}
     "$printer" '  Time       : %s\n  Run ID     : %s\n  Mode       : %s\n  Server     : %s\n  ID         : %s' \
-        "$time" "$run_id" "$mode" "$name" "$id"
+        "$time" "$run_id" "$(presentation_value "$printer" "$mode")" "$name" "$id"
     if [[ -n "$source_name" ]]; then
         "$printer" '\n  Source          : %s' "$source_name"
     fi
     "$printer" '\n  Stage      : %s\n  Reason     : %s\n  Exit Code  : %s\n  Stage Attempts  : %s' \
-        "$stage" "$reason" "$exit_code" "$attempts"
+        "$(presentation_value "$printer" "$stage")" "$(presentation_value "$printer" "$reason")" "$exit_code" "$attempts"
     if [[ -n "$raw" ]]; then
         "$printer" '\n--------------------------------------------------------------------------------\nRAW OUTPUT\n%s' "$raw"
     fi
@@ -2437,17 +2557,17 @@ render_server_result() {
     local printer=$1 dry_run=$2 name=$3 archive_summary=$4 sync_summary=$5 duration=$6
     if (( dry_run == 1 )); then
         "$printer" '[OK] %-20s archive=%-20s sync=%-8s duration=%s' \
-            "$name" "$archive_summary" "$sync_summary" "$(format_duration "$duration")"
+            "$name" "$(presentation_value "$printer" "$archive_summary")" "$(presentation_value "$printer" "$sync_summary")" "$(format_duration "$duration")"
     else
         "$printer" '[OK] %-20s archive=%-20s sync=%-8s transferred=%s avg_speed=%s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s' \
-            "$name" "$archive_summary" "$sync_summary" \
-            "$(server_transfer_size_display)" \
-            "$(server_average_speed_display)" \
-            "$(server_change_value "$SERVER_CHANGE_COUNT")" \
-            "$(server_change_value "$SERVER_CHANGE_CREATED")" \
-            "$(server_change_value "$SERVER_CHANGE_UPDATED")" \
-            "$(server_change_value "$SERVER_CHANGE_DELETED")" \
-            "$SERVER_CHANGE_ATTEMPTS" "$SERVER_CHANGE_COMPLETE" "$(format_duration "$duration")"
+            "$name" "$(presentation_value "$printer" "$archive_summary")" "$(presentation_value "$printer" "$sync_summary")" \
+            "$(presentation_value "$printer" "$(server_transfer_size_display)")" \
+            "$(presentation_value "$printer" "$(server_average_speed_display)")" \
+            "$(presentation_value "$printer" "$(server_change_value "$SERVER_CHANGE_COUNT")")" \
+            "$(presentation_value "$printer" "$(server_change_value "$SERVER_CHANGE_CREATED")")" \
+            "$(presentation_value "$printer" "$(server_change_value "$SERVER_CHANGE_UPDATED")")" \
+            "$(presentation_value "$printer" "$(server_change_value "$SERVER_CHANGE_DELETED")")" \
+            "$SERVER_CHANGE_ATTEMPTS" "$(presentation_value "$printer" "$SERVER_CHANGE_COMPLETE")" "$(format_duration "$duration")"
     fi
 }
 
@@ -2679,7 +2799,7 @@ run_batch() {
     summary_body=$(printf '  Time     : %s\n  Run ID   : %s\n  Mode     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Success  : %d\n  Warning  : %d\n  Failed   : %d\n  Duration : %s' \
         "$summary_time" "$RUN_ID" "$mode" "$success_lines" "$success_count" "$warning_count" "$failed_count" "$(format_duration "$duration")")
     summary_display_body=$(ui_printf '  Time     : %s\n  Run ID   : %s\n  Mode     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Success  : %d\n  Warning  : %d\n  Failed   : %d\n  Duration : %s' \
-        "$summary_time" "$RUN_ID" "$mode" "$success_display_lines" "$success_count" "$warning_count" "$failed_count" "$(format_duration "$duration")")
+        "$summary_time" "$RUN_ID" "$(ui_code "$mode")" "$success_display_lines" "$success_count" "$warning_count" "$failed_count" "$(format_duration "$duration")")
 
     if (( dry_run == 0 )); then
         append_log_block "$SUCCESS_LOG" 'RUN START' "$summary_body" || persistence_failed=1
@@ -2809,7 +2929,7 @@ run_archive_only() {
         case "$rc" in
             0)
                 success_lines+="$(printf '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable' "$name" "$local_name" "$LAST_ARCHIVE_STATUS")"$'\n'
-                success_display_lines+="$(ui_printf '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable' "$name" "$local_name" "$LAST_ARCHIVE_STATUS")"$'\n'
+                success_display_lines+="$(ui_printf '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable' "$name" "$local_name" "$(ui_code "$LAST_ARCHIVE_STATUS")")"$'\n'
                 ;;
             2)
                 if (( overall == 0 )); then
@@ -2835,7 +2955,7 @@ run_archive_only() {
     summary_body=$(printf '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s' \
         "$summary_time" "$RUN_ID" "$success_lines" "$status" "$(format_duration "$duration")")
     summary_display_body=$(ui_printf '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s' \
-        "$summary_time" "$RUN_ID" "$success_display_lines" "$status" "$(format_duration "$duration")")
+        "$summary_time" "$RUN_ID" "$success_display_lines" "$(ui_code "$status")" "$(format_duration "$duration")")
     append_log_block "$SUCCESS_LOG" 'ARCHIVE ONLY' "$summary_body" || persistence_failed=1
     if [[ -n "$failure_body" ]]; then
         failure_body=${failure_body%$'\n'}
@@ -2855,7 +2975,7 @@ run_archive_only() {
             reason='LOG_MAINTENANCE_WARNING'
         fi
         summary_body+=$(printf '\n  Log Maintenance : WARNING\n  Final Status    : %s' "$status")
-        summary_display_body+=$(ui_printf '\n  Log Maintenance : WARNING\n  Final Status    : %s' "$status")
+        summary_display_body+=$(ui_printf '\n  Log Maintenance : WARNING\n  Final Status    : %s' "$(ui_code "$status")")
     fi
     if (( persistence_failed != 0 )); then
         overall=1
@@ -2870,7 +2990,7 @@ run_archive_only() {
     fi
     if (( persistence_failed != 0 )); then
         summary_body+=$(printf '\n  Final Status : %s\n  Reason       : %s' "$status" "$reason")
-        summary_display_body+=$(ui_printf '\n  Final Status : %s\n  Reason       : %s' "$status" "$reason")
+        summary_display_body+=$(ui_printf '\n  Final Status : %s\n  Reason       : %s' "$(ui_code "$status")" "$(ui_code "$reason")")
     fi
     printf '%s\n' "$summary_display_body"
     (( persistence_failed == 0 )) || return 1

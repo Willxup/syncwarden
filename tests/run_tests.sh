@@ -3635,12 +3635,35 @@ test_localized_summaries_preserve_persisted_records() {
     assert_file_not_exists "$tmp/dry-home/state/last-status/one.status" 'translated dry-run writes no status'
 }
 
+test_chinese_status_explains_codes_without_rewriting_state() {
+    local tmp before output rc
+    tmp=$(make_temp_dir)
+    configure_home_paths "$tmp/home"
+    ensure_home_layout
+    load_config "$FIXTURE_DIR/base.conf"
+    before=$'time=2026-07-12 09:00:00 +00:00\nstatus=FAILED\nmode=MANUAL\nreason=HOST_KEY_CHANGED\nexit_code=1\nchange_complete=no\nfuture_field=%s\\n\nunknown-line'
+    printf '%s\n' "$before" >"$LAST_STATUS_DIR/sample-server.status"
+    output=$(SYNCWARDEN_LANG=zh print_status sample-server)
+    rc=$?
+    assert_eq '0' "$rc" 'Chinese status query keeps its exit code'
+    assert_contains '状态 (status): 失败 (FAILED)' "$output" 'status shows both Chinese meaning and stable code'
+    assert_contains '原因 (reason): SSH 主机密钥已变化 (HOST_KEY_CHANGED)' "$output" 'status explains failure codes in Chinese'
+    assert_contains 'future_field=%s\n' "$output" 'unknown future state fields remain literal'
+    assert_contains 'unknown-line' "$output" 'unrecognized state lines are preserved'
+    assert_eq "$before" "$(<"$LAST_STATUS_DIR/sample-server.status")" 'localized status never rewrites the state file'
+    output=$(SYNCWARDEN_LANG=en print_status sample-server)
+    assert_eq "$(printf 'Status for sample-server:\n'; sed 's/^/  /' "$LAST_STATUS_DIR/sample-server.status")" "$output" 'English status preserves its original byte format'
+    assert_eq '未识别 %s' "$(SYNCWARDEN_LANG=zh ui_code '未识别 %s')" 'unknown codes are preserved literally'
+    assert_eq '不可用 (unavailable)' "$(SYNCWARDEN_LANG=zh ui_code unavailable)" 'non-numeric metric states have Chinese explanations'
+}
+
 run_i18n_suite() {
     test_language_selection_and_help_are_read_only
     test_localized_cli_keeps_arguments_and_query_data
     test_localized_configuration_errors_preserve_canonical_reason
     test_localized_runtime_guards_keep_failure_semantics
     test_localized_summaries_preserve_persisted_records
+    test_chinese_status_explains_codes_without_rewriting_state
 }
 
 if [[ ! -r "$SCRIPT_PATH" ]]; then
