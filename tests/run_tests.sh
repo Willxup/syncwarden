@@ -3552,10 +3552,46 @@ test_localized_configuration_errors_preserve_canonical_reason() {
     assert_contains '远程 source 必须是绝对路径' "$(<"$tmp/zh.out")" 'path validation details are translated'
 }
 
+test_localized_runtime_guards_keep_failure_semantics() {
+    local tmp language rc expected_warning='' SYNCWARDEN_LANG
+    tmp=$(make_temp_dir)
+    mkdir -p "$tmp/payload"
+    prepare_transport_test "$tmp/home" "$tmp/payload"
+    DF_BIN="$TEST_DIR/fakes/df"
+    FAKE_DF_AVAILABLE_MB=0
+    export FAKE_DF_AVAILABLE_MB
+    for language in en zh; do
+        SYNCWARDEN_LANG=$language
+        check_destination_capacity sample-server >"$tmp/$language.out" 2>&1
+        rc=$?
+        assert_eq '1' "$rc" 'capacity guard fails in either language'
+        assert_eq 'LOW_FREE_SPACE' "$LAST_CAPACITY_REASON" 'capacity failure classification is language-independent'
+        if [[ "$language" == zh ]]; then
+            assert_contains '容量错误' "$(<"$tmp/zh.out")" 'capacity diagnostic is translated'
+        fi
+        LOG_MAINTENANCE_MESSAGES=''
+        log_maintenance_warn 'rotated log already exists; source preserved: %s' '/tmp/原始-%s.log' >"$tmp/$language.warn" 2>&1
+        if [[ "$language" == en ]]; then
+            expected_warning=$LOG_MAINTENANCE_MESSAGES
+        else
+            assert_eq "$expected_warning" "$LOG_MAINTENANCE_MESSAGES" 'persisted maintenance warning stays canonical'
+            assert_contains '保留原文件：/tmp/原始-%s.log' "$(<"$tmp/zh.warn")" 'translated maintenance warning preserves user data'
+        fi
+    done
+    unset FAKE_DF_AVAILABLE_MB
+    DF_BIN=$(command -v df)
+    SERVER_VALUES['sample-server:key_file']="$tmp/missing-key"
+    SYNCWARDEN_LANG=zh check_private_key sample-server >"$tmp/key.out" 2>&1
+    rc=$?
+    assert_eq '1' "$rc" 'Chinese private key check preserves failure status'
+    assert_contains '私钥错误' "$(<"$tmp/key.out")" 'private key guard is translated'
+}
+
 run_i18n_suite() {
     test_language_selection_and_help_are_read_only
     test_localized_cli_keeps_arguments_and_query_data
     test_localized_configuration_errors_preserve_canonical_reason
+    test_localized_runtime_guards_keep_failure_semantics
 }
 
 if [[ ! -r "$SCRIPT_PATH" ]]; then

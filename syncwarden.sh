@@ -92,6 +92,50 @@ ui_printf() {
             "server '%s': target exists but is not a directory: '%s'") format="服务器 '%s'：目标已存在但不是目录：'%s'" ;;
             "duplicate resolved target '%s' for servers '%s' and '%s'") format="解析后的目标 '%s' 重复，涉及服务器 '%s' 和 '%s'" ;;
             "managed path overlap: server '%s' %s '%s' and server '%s' %s '%s'") format="受管路径重叠：服务器 '%s' 的 %s '%s' 与服务器 '%s' 的 %s '%s'" ;;
+            'log error: target is not a regular file: %s\n') format='日志错误：目标不是普通文件：%s\n' ;;
+            'configuration failure log error: cannot initialize SyncWarden control directories\n') format='配置失败日志错误：无法初始化 SyncWarden 控制目录\n' ;;
+            'configuration failure log error: cannot determine monthly failure log\n') format='配置失败日志错误：无法确定月度失败日志\n' ;;
+            'configuration failure log error: cannot append to %s\n') format='配置失败日志错误：无法追加写入 %s\n' ;;
+            'missing required commands: %s\n') format='缺少必需命令：%s\n' ;;
+            "private key error: server '%s' key must be a readable regular non-symlink file: %s\\n") format="私钥错误：服务器 '%s' 的私钥必须是可读的普通文件且不是符号链接：%s\\n" ;;
+            "private key error: cannot read permissions for server '%s': %s\\n") format="私钥错误：无法读取服务器 '%s' 的私钥权限：%s\\n" ;;
+            "private key permissions are unsafe for server '%s': %s is mode %s; group/other access must be 00\\n") format="服务器 '%s' 的私钥权限不安全：%s 的权限为 %s；组和其他用户的权限必须为 00\\n" ;;
+            'warning: failed to remove managed archive: %s\n') format='警告：无法删除受管归档：%s\n' ;;
+            'capacity error: no existing filesystem ancestor for %s\n') format='容量错误：%s 没有已存在的文件系统上级路径\n' ;;
+            'capacity error: free-space check timed out for %s\n') format='容量错误：%s 的可用空间检查超时\n' ;;
+            'capacity error: unable to read free space for %s\n') format='容量错误：无法读取 %s 的可用空间\n' ;;
+            'capacity error: unable to parse free space for %s\n') format='容量错误：无法解析 %s 的可用空间\n' ;;
+            'capacity error: inode check timed out for %s\n') format='容量错误：%s 的 inode 检查超时\n' ;;
+            'capacity error: unable to read free inodes for %s\n') format='容量错误：无法读取 %s 的可用 inode 数量\n' ;;
+            'capacity error: unable to parse free inodes for %s\n') format='容量错误：无法解析 %s 的可用 inode 数量\n' ;;
+            'capacity error: invalid df output for %s\n') format='容量错误：%s 的 df 输出无效\n' ;;
+            'capacity error: %s has %s MB free; server %s requires at least %s MB\n') format='容量错误：%s 可用空间为 %s MB；服务器 %s 至少需要 %s MB\n' ;;
+            'capacity error: %s has %s free inodes; server %s requires at least %s\n') format='容量错误：%s 有 %s 个可用 inode；服务器 %s 至少需要 %s 个\n' ;;
+            'archive error: unsafe destination path for %s/%s\n') format='归档错误：%s/%s 的目标路径不安全\n' ;;
+            'archive error: unable to find a unique timestamp name for %s\n') format='归档错误：无法为 %s 找到唯一时间戳名称\n' ;;
+            'internal error: retry loop exhausted for %s/%s\n') format='内部错误：%s/%s 的重试循环已耗尽\n' ;;
+            'global timeout log error: cannot initialize SyncWarden control directories\n') format='全局超时日志错误：无法初始化 SyncWarden 控制目录\n' ;;
+            'global timeout log error: cannot determine monthly failure log\n') format='全局超时日志错误：无法确定月度失败日志\n' ;;
+            'global timeout log error: cannot append to %s\n') format='全局超时日志错误：无法追加写入 %s\n' ;;
+            'warning: %s\n') format='警告：%s\n' ;;
+            'rotated log already exists; source preserved: %s') format='轮转日志已存在，保留原文件：%s' ;;
+            'cannot create gzip part file for: %s') format='无法创建 gzip 临时文件：%s' ;;
+            'failed to compress managed log; source preserved: %s') format='无法压缩受管日志，保留原文件：%s' ;;
+            'failed to set gzip mode; source preserved: %s') format='无法设置 gzip 文件权限，保留原文件：%s' ;;
+            'failed to promote compressed log; source preserved: %s') format='无法将压缩日志提升为正式文件，保留原文件：%s' ;;
+            'rotated log appeared during promotion; source preserved: %s') format='提升期间出现同名轮转日志，保留原文件：%s' ;;
+            'compressed log created but source removal failed: %s') format='已创建压缩日志，但无法删除原文件：%s' ;;
+            'log directories are missing or symbolic links; maintenance skipped') format='日志目录不存在或为符号链接，已跳过维护' ;;
+            'cannot determine log-maintenance reference time') format='无法确定日志维护的参考时间' ;;
+            'invalid log-maintenance reference epoch: %s') format='日志维护参考时间戳无效：%s' ;;
+            'cannot determine current month from epoch: %s') format='无法从时间戳确定当前月份：%s' ;;
+            'cannot determine oldest retained month from: %s') format='无法确定最早保留月份，参考月份：%s' ;;
+            'cannot create managed-log discovery manifest') format='无法创建受管日志扫描清单' ;;
+            'cannot create rotated-log discovery manifest') format='无法创建轮转日志扫描清单' ;;
+            'managed-log discovery failed; maintenance skipped') format='受管日志扫描失败，已跳过维护' ;;
+            'rotated-log discovery failed; maintenance skipped') format='轮转日志扫描失败，已跳过维护' ;;
+            'failed to remove expired managed log: %s') format='无法删除过期受管日志：%s' ;;
+            'failed to remove expired compressed log: %s') format='无法删除过期压缩日志：%s' ;;
         esac
     fi
     printf -- "$format" "$@"
@@ -726,7 +770,7 @@ append_log_block() {
 
     mkdir -p -- "$(dirname -- "$file")" || return 1
     [[ ! -e "$file" || ( -f "$file" && ! -L "$file" ) ]] || {
-        printf 'log error: target is not a regular file: %s\n' "$file" >&2
+        ui_printf 'log error: target is not a regular file: %s\n' "$file" >&2
         return 1
     }
     render_log_block "$title" "$body" >>"$file" || return 1
@@ -739,17 +783,17 @@ persist_configuration_failure() {
     RUN_ID=${SYNCWARDEN_RUN_ID:-$(new_run_id)}
 
     if ! ensure_home_layout; then
-        printf 'configuration failure log error: cannot initialize SyncWarden control directories\n' >&2
+        ui_printf 'configuration failure log error: cannot initialize SyncWarden control directories\n' >&2
         return 1
     fi
     refresh_log_paths || {
-        printf 'configuration failure log error: cannot determine monthly failure log\n' >&2
+        ui_printf 'configuration failure log error: cannot determine monthly failure log\n' >&2
         return 1
     }
     body=$(printf '  Time        : %s\n  Run ID      : %s\n  Mode        : %s\n  Config File : %s\n  Stage       : CONFIGURATION\n  Reason      : %s' \
         "$(timestamp_now)" "$RUN_ID" "$mode" "$CONFIG_FILE" "$reason")
     append_log_block "$FAILURE_LOG" 'FAILURE - CONFIGURATION' "$body" || {
-        printf 'configuration failure log error: cannot append to %s\n' "$FAILURE_LOG" >&2
+        ui_printf 'configuration failure log error: cannot append to %s\n' "$FAILURE_LOG" >&2
         return 1
     }
 }
@@ -784,7 +828,7 @@ check_dependencies() {
         command -v "$command_name" >/dev/null 2>&1 || missing+=("$command_name")
     done
     if (( ${#missing[@]} > 0 )); then
-        printf 'missing required commands: %s\n' "${missing[*]}" >&2
+        ui_printf 'missing required commands: %s\n' "${missing[*]}" >&2
         return 1
     fi
 }
@@ -793,16 +837,16 @@ check_private_key() {
     local id=$1 key_file mode
     key_file=$(resolve_value "$id" key_file)
     [[ -f "$key_file" && ! -L "$key_file" && -r "$key_file" ]] || {
-        printf "private key error: server '%s' key must be a readable regular non-symlink file: %s\n" "$id" "$key_file" >&2
+        ui_printf "private key error: server '%s' key must be a readable regular non-symlink file: %s\n" "$id" "$key_file" >&2
         return 1
     }
     mode=$(stat -Lc '%a' -- "$key_file" 2>/dev/null) || {
-        printf "private key error: cannot read permissions for server '%s': %s\n" "$id" "$key_file" >&2
+        ui_printf "private key error: cannot read permissions for server '%s': %s\n" "$id" "$key_file" >&2
         return 1
     }
     mode=${mode: -3}
     [[ ${#mode} -eq 3 && "${mode:1:2}" == '00' ]] || {
-        printf "private key permissions are unsafe for server '%s': %s is mode %s; group/other access must be 00\n" \
+        ui_printf "private key permissions are unsafe for server '%s': %s is mode %s; group/other access must be 00\n" \
             "$id" "$key_file" "$mode" >&2
         return 1
     }
@@ -1203,7 +1247,7 @@ cleanup_archives() {
         if run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" "$RM_BIN" -f -- "$path"; then
             :
         else
-            printf 'warning: failed to remove managed archive: %s\n' "$path" >&2
+            ui_printf 'warning: failed to remove managed archive: %s\n' "$path" >&2
             delete_failed=1
             printf '%s|%s|%s|%s\n' "$epoch" "$month" "$sha" "$path" >>"$temp_file" || {
                 discard_temp_file "$temp_file"
@@ -1320,7 +1364,7 @@ check_destination_capacity() {
     destination=$(resolved_destination "$id")
     probe=$(nearest_existing_path "$destination") || {
         LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-        printf 'capacity error: no existing filesystem ancestor for %s\n' "$destination" >&2
+        ui_printf 'capacity error: no existing filesystem ancestor for %s\n' "$destination" >&2
         return 1
     }
     output=$(run_with_timeout "$CAPACITY_CHECK_TIMEOUT_SECONDS" "$DF_BIN" -Pm -- "$probe" 2>/dev/null)
@@ -1328,16 +1372,16 @@ check_destination_capacity() {
     if (( rc != 0 )); then
         if (( rc == 124 || rc == 137 )); then
             LAST_CAPACITY_REASON='CAPACITY_CHECK_TIMEOUT'
-            printf 'capacity error: free-space check timed out for %s\n' "$probe" >&2
+            ui_printf 'capacity error: free-space check timed out for %s\n' "$probe" >&2
         else
             LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-            printf 'capacity error: unable to read free space for %s\n' "$probe" >&2
+            ui_printf 'capacity error: unable to read free space for %s\n' "$probe" >&2
         fi
         return 1
     fi
     available_mb=$(awk 'NR == 2 { print $4 }' <<<"$output") || {
         LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-        printf 'capacity error: unable to parse free space for %s\n' "$probe" >&2
+        ui_printf 'capacity error: unable to parse free space for %s\n' "$probe" >&2
         return 1
     }
     output=$(run_with_timeout "$CAPACITY_CHECK_TIMEOUT_SECONDS" "$DF_BIN" -Pi -- "$probe" 2>/dev/null)
@@ -1345,21 +1389,21 @@ check_destination_capacity() {
     if (( rc != 0 )); then
         if (( rc == 124 || rc == 137 )); then
             LAST_CAPACITY_REASON='CAPACITY_CHECK_TIMEOUT'
-            printf 'capacity error: inode check timed out for %s\n' "$probe" >&2
+            ui_printf 'capacity error: inode check timed out for %s\n' "$probe" >&2
         else
             LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-            printf 'capacity error: unable to read free inodes for %s\n' "$probe" >&2
+            ui_printf 'capacity error: unable to read free inodes for %s\n' "$probe" >&2
         fi
         return 1
     fi
     available_inodes=$(awk 'NR == 2 { print $4 }' <<<"$output") || {
         LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-        printf 'capacity error: unable to parse free inodes for %s\n' "$probe" >&2
+        ui_printf 'capacity error: unable to parse free inodes for %s\n' "$probe" >&2
         return 1
     }
     is_nonnegative_integer "$available_mb" && is_nonnegative_integer "$available_inodes" || {
         LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-        printf 'capacity error: invalid df output for %s\n' "$probe" >&2
+        ui_printf 'capacity error: invalid df output for %s\n' "$probe" >&2
         return 1
     }
 
@@ -1367,13 +1411,13 @@ check_destination_capacity() {
     min_inodes=$(resolve_value "$id" min_free_inodes)
     if (( 10#$available_mb < 10#$min_mb )); then
         LAST_CAPACITY_REASON='LOW_FREE_SPACE'
-        printf 'capacity error: %s has %s MB free; server %s requires at least %s MB\n' \
+        ui_printf 'capacity error: %s has %s MB free; server %s requires at least %s MB\n' \
             "$probe" "$available_mb" "$id" "$min_mb" >&2
         return 1
     fi
     if (( 10#$available_inodes < 10#$min_inodes )); then
         LAST_CAPACITY_REASON='LOW_FREE_INODES'
-        printf 'capacity error: %s has %s free inodes; server %s requires at least %s\n' \
+        ui_printf 'capacity error: %s has %s free inodes; server %s requires at least %s\n' \
             "$probe" "$available_inodes" "$id" "$min_inodes" >&2
         return 1
     fi
@@ -1397,7 +1441,7 @@ archive_source() {
     local_path="${destination%/}/$local_name"
 
     if ! ensure_safe_target_path "$id" "$local_name"; then
-        printf 'archive error: unsafe destination path for %s/%s\n' "$id" "$local_name" >&2
+        ui_printf 'archive error: unsafe destination path for %s/%s\n' "$id" "$local_name" >&2
         LAST_ARCHIVE_STATUS='FAILED_UNSAFE_DESTINATION'
         return 1
     fi
@@ -1420,7 +1464,7 @@ archive_source() {
         epoch=$((epoch + 1))
         collision_count=$((collision_count + 1))
         if (( collision_count > 3600 )); then
-            printf 'archive error: unable to find a unique timestamp name for %s\n' "$local_name" >&2
+            ui_printf 'archive error: unable to find a unique timestamp name for %s\n' "$local_name" >&2
             LAST_ARCHIVE_STATUS='FAILED_NAME_COLLISION'
             return 1
         fi
@@ -1711,7 +1755,7 @@ run_command_with_retry() {
         attempt=$((attempt + 1))
     done
 
-    printf 'internal error: retry loop exhausted for %s/%s\n' "$id" "$stage" >&2
+    ui_printf 'internal error: retry loop exhausted for %s/%s\n' "$id" "$stage" >&2
     return 1
 }
 
@@ -2210,9 +2254,10 @@ log_month_key() {
 }
 
 log_maintenance_warn() {
-    local message=$1
+    local message
+    printf -v message -- "$@"
     LOG_MAINTENANCE_MESSAGES+="${LOG_MAINTENANCE_MESSAGES:+$'\n'}$message"
-    printf 'warning: %s\n' "$message" >&2
+    ui_printf 'warning: %s\n' "$(ui_printf "$@")" >&2
 }
 
 compress_managed_log() {
@@ -2221,36 +2266,36 @@ compress_managed_log() {
     local part
 
     if [[ -e "$destination" || -L "$destination" ]]; then
-        log_maintenance_warn "rotated log already exists; source preserved: $destination"
+        log_maintenance_warn 'rotated log already exists; source preserved: %s' "$destination"
         return 2
     fi
     make_temp_file part "$ROTATED_LOG_DIR/.$kind-$month.log.XXXXXX.part.gz" || {
-        log_maintenance_warn "cannot create gzip part file for: $source"
+        log_maintenance_warn 'cannot create gzip part file for: %s' "$source"
         return 2
     }
     if ! run_with_timeout "$LOG_COMMAND_TIMEOUT_SECONDS" "$GZIP_BIN" -c -- "$source" >"$part"; then
         discard_temp_file "$part"
-        log_maintenance_warn "failed to compress managed log; source preserved: $source"
+        log_maintenance_warn 'failed to compress managed log; source preserved: %s' "$source"
         return 2
     fi
     run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" chmod 0600 -- "$part" || {
         discard_temp_file "$part"
-        log_maintenance_warn "failed to set gzip mode; source preserved: $source"
+        log_maintenance_warn 'failed to set gzip mode; source preserved: %s' "$source"
         return 2
     }
     if ! run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" mv -T -n -- "$part" "$destination"; then
         discard_temp_file "$part"
-        log_maintenance_warn "failed to promote compressed log; source preserved: $source"
+        log_maintenance_warn 'failed to promote compressed log; source preserved: %s' "$source"
         return 2
     fi
     if [[ -e "$part" || -L "$part" ]]; then
         discard_temp_file "$part"
-        log_maintenance_warn "rotated log appeared during promotion; source preserved: $destination"
+        log_maintenance_warn 'rotated log appeared during promotion; source preserved: %s' "$destination"
         return 2
     fi
     unregister_temp_file "$part"
     if ! run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" "$RM_BIN" -f -- "$source"; then
-        log_maintenance_warn "compressed log created but source removal failed: $source"
+        log_maintenance_warn 'compressed log created but source removal failed: %s' "$source"
         return 2
     fi
     return 0
@@ -2272,16 +2317,16 @@ maintain_monthly_logs() {
         return 2
     }
     current_month=$(date -d "@$reference" +%Y-%m) || {
-        log_maintenance_warn "invalid log-maintenance reference epoch: $reference"
+        log_maintenance_warn 'invalid log-maintenance reference epoch: %s' "$reference"
         return 2
     }
     month_start=$(date -d "@$reference" +%Y-%m-01) || {
-        log_maintenance_warn "cannot determine current month from epoch: $reference"
+        log_maintenance_warn 'cannot determine current month from epoch: %s' "$reference"
         return 2
     }
     retention=${GLOBAL[log_retention_months]}
     oldest_month=$(date -d "$month_start -$((retention - 1)) months" +%Y-%m) || {
-        log_maintenance_warn "cannot determine oldest retained month from: $month_start"
+        log_maintenance_warn 'cannot determine oldest retained month from: %s' "$month_start"
         return 2
     }
     current_key=$(log_month_key "$current_month")
@@ -2320,7 +2365,7 @@ maintain_monthly_logs() {
         key=$(log_month_key "$month")
         if (( key < oldest_key )); then
             run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" "$RM_BIN" -f -- "$path" || {
-                log_maintenance_warn "failed to remove expired managed log: $path"
+                log_maintenance_warn 'failed to remove expired managed log: %s' "$path"
                 warning=1
             }
         elif (( key < current_key )); then
@@ -2338,7 +2383,7 @@ maintain_monthly_logs() {
         key=$(log_month_key "$month")
         if (( key < oldest_key )); then
             run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" "$RM_BIN" -f -- "$path" || {
-                log_maintenance_warn "failed to remove expired compressed log: $path"
+                log_maintenance_warn 'failed to remove expired compressed log: %s' "$path"
                 warning=1
             }
         fi
@@ -2969,18 +3014,18 @@ persist_global_timeout() {
     local body
 
     ensure_home_layout || {
-        printf 'global timeout log error: cannot initialize SyncWarden control directories\n' >&2
+        ui_printf 'global timeout log error: cannot initialize SyncWarden control directories\n' >&2
         return 1
     }
     refresh_log_paths || {
-        printf 'global timeout log error: cannot determine monthly failure log\n' >&2
+        ui_printf 'global timeout log error: cannot determine monthly failure log\n' >&2
         return 1
     }
     body=$(printf '  Time       : %s\n  Run ID     : %s\n  Mode       : %s\n  Stage      : GLOBAL_RUNTIME\n  Reason     : GLOBAL_TIMEOUT\n  Exit Code  : 124\n  Limit      : %s (%s seconds)' \
         "$(timestamp_now)" "$run_id" "$mode" \
         "$(format_global_runtime_limit)" "$GLOBAL_RUNTIME_TIMEOUT_SECONDS")
     append_log_block "$FAILURE_LOG" 'FAILURE - GLOBAL TIMEOUT' "$body" || {
-        printf 'global timeout log error: cannot append to %s\n' "$FAILURE_LOG" >&2
+        ui_printf 'global timeout log error: cannot append to %s\n' "$FAILURE_LOG" >&2
         return 1
     }
 }
