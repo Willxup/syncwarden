@@ -2963,6 +2963,7 @@ test_cli_lock_contention_returns_75() {
 }
 
 test_scheduled_cli_noop_and_due_state() {
+    local not_due_text=${1:-'No SyncWarden task is due'} completed_text=${2:-'already completed'}
     local tmp config payload rc output state_file state_content args first_count second_count
     tmp=$(make_temp_dir)
     config="$tmp/integration.conf"
@@ -2979,7 +2980,7 @@ test_scheduled_cli_noop_and_due_state() {
     output=$(run_integration_cli "$tmp/home" "$config" --scheduled 2>&1)
     rc=$?
     assert_eq '0' "$rc" 'unconfigured scheduled hour exits zero'
-    assert_contains 'No SyncWarden task is due' "$output" 'unconfigured hour explains no-op'
+    assert_contains "$not_due_text" "$output" 'unconfigured hour explains no-op'
     assert_file_not_exists "$FAKE_RSYNC_ARGS_FILE" 'unconfigured hour invokes no rsync'
 
     SYNCWARDEN_NOW_HOUR=3
@@ -3005,7 +3006,7 @@ test_scheduled_cli_noop_and_due_state() {
     rc=$?
     second_count=$(wc -l <"$FAKE_RSYNC_ARGS_FILE")
     assert_eq '0' "$rc" 'repeated invocation of the same schedule slot is a safe no-op'
-    assert_contains 'already completed' "$output" 'repeated schedule slot explains why it was skipped'
+    assert_contains "$completed_text" "$output" 'repeated schedule slot explains why it was skipped'
     assert_eq "$first_count" "$second_count" 'repeated schedule slot does not invoke rsync again'
 }
 
@@ -3056,7 +3057,7 @@ test_dry_run_prints_failure_reason_without_writing_failure_log() {
 }
 
 test_archive_only_cli_writes_styled_log_and_status() {
-    local tmp config payload rc success_content status_content
+    local tmp config payload rc success_content status_content output
     tmp=$(make_temp_dir)
     config="$tmp/integration.conf"
     payload="$tmp/payload"
@@ -3067,9 +3068,10 @@ test_archive_only_cli_writes_styled_log_and_status() {
     FAKE_ZIP_MODE=success
     SYNCWARDEN_NOW_EPOCH=$(date -d '2026-07-11 18:42:16 +0000' +%s)
     export FAKE_ZIP_MODE SYNCWARDEN_NOW_EPOCH
-    run_integration_cli "$tmp/home" "$config" --archive one >/dev/null
+    output=$(run_integration_cli "$tmp/home" "$config" --archive one)
     rc=$?
     assert_eq '0' "$rc" 'archive-only CLI succeeds'
+    assert_contains "${1:-SUMMARY}" "$output" 'archive-only displays the requested language summary'
     success_content=$(<"$tmp/home/logs/success-2026-07.log")
     assert_contains 'ARCHIVE ONLY' "$success_content" 'archive-only success is logged with its mode'
     assert_contains '================================================================================' "$success_content" 'archive-only log has visible separators'
@@ -3545,7 +3547,6 @@ test_localized_configuration_errors_preserve_canonical_reason() {
     assert_eq "$english_reason" "$LAST_CONFIG_ERROR" 'parser section errors retain the same stored reason'
     assert_contains "第 1 行：未知分节：'unexpected'" "$(<"$tmp/zh.out")" 'parser keeps line number and section data in Chinese'
     load_config "$FIXTURE_DIR/base.conf"
-    SERVER_VALUES['sample-server:source']='relative'
     SERVER_SOURCES['sample-server:0']='relative'
     SYNCWARDEN_LANG=en validate_config >"$tmp/en.out" 2>&1
     english_reason=$LAST_CONFIG_ERROR
@@ -3660,6 +3661,22 @@ test_chinese_status_explains_codes_without_rewriting_state() {
     assert_eq '不可用 (unavailable)' "$(SYNCWARDEN_LANG=zh ui_code unavailable)" 'non-numeric metric states have Chinese explanations'
 }
 
+test_chinese_mode_keeps_engine_guards() {
+    local SYNCWARDEN_LANG=zh
+    # Reuse behavioral assertions against the Chinese execution path. These check
+    # external command arguments, return codes, persisted records, and side effects.
+    test_sync_command_preserves_mirror_semantics
+    test_sync_transient_retry_and_permanent_failure
+    test_archive_verification_failure_leaves_no_artifact_or_index
+    test_archive_failure_blocks_only_that_server_sync
+    FAKE_ZIP_MODE=success
+    test_batch_exit_codes_success_and_warning
+    test_archive_only_cli_writes_styled_log_and_status '汇总'
+    test_scheduled_cli_noop_and_due_state '当前小时没有到期' '调度时段已完成'
+    test_manual_global_timeout_logs_and_cleans_up
+    test_dry_run_global_timeout_preserves_zero_write
+}
+
 run_i18n_suite() {
     test_language_selection_and_help_are_read_only
     test_localized_cli_keeps_arguments_and_query_data
@@ -3667,6 +3684,7 @@ run_i18n_suite() {
     test_localized_runtime_guards_keep_failure_semantics
     test_localized_summaries_preserve_persisted_records
     test_chinese_status_explains_codes_without_rewriting_state
+    test_chinese_mode_keeps_engine_guards
 }
 
 if [[ ! -r "$SCRIPT_PATH" ]]; then
@@ -3691,13 +3709,13 @@ case "$CURRENT_SUITE" in
     all)
         run_parser_suite
         run_cli_suite
-        run_i18n_suite
         run_retention_suite
         run_archive_suite
         run_transport_suite
         run_orchestration_suite
         run_log_suite
         run_integration_suite
+        run_i18n_suite
         ;;
     *) printf 'Unknown suite: %s\n' "$CURRENT_SUITE" >&2; exit 64 ;;
 esac
