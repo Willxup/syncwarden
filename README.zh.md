@@ -207,6 +207,46 @@ source 的最后一级名称会成为本地镜像目录名，因此同一服务�
 syncwarden.sh sample-server --dry-run
 ```
 
+## 语言
+
+帮助、诊断、查询和终端摘要默认使用英文。通过 `SYNCWARDEN_LANG=zh`
+显式选择简体中文：
+
+```bash
+SYNCWARDEN_LANG=zh ./syncwarden.sh --help
+SYNCWARDEN_LANG=zh ./syncwarden.sh --list
+SYNCWARDEN_LANG=zh ./syncwarden.sh --status sample-server
+SYNCWARDEN_LANG=en ./syncwarden.sh sample-server --dry-run
+```
+
+同一设置适用于手动同步、仅归档和定时运行。若希望当前 shell 持续使用中文，
+执行 `export SYNCWARDEN_LANG=zh`。通过 sudo 运行时，显式传入语言设置：
+
+```bash
+sudo env SYNCWARDEN_LANG=zh /opt/syncwarden/syncwarden.sh --check
+```
+
+推荐使用 `en` 或 `zh`。同时接受中文别名 `zh-CN`、`zh_CN`、`zh_CN.UTF-8`
+和 `zh_CN.utf8`。未设置、空值或不支持的值均回退为英文。主机的 `LANG`/`LC_*`
+不会决定显示语言。不要在 INI 配置中添加语言配置键。
+
+| 内容 | 语言行为 |
+| --- | --- |
+| 帮助、用法错误、配置检查和运行诊断 | 默认英文；选定中文时使用中文 |
+| 服务器列表、状态查询、dry-run 标题和运行摘要 | 翻译标签和解释，同时保留原始状态码与原因码 |
+| 最终配置（`--show-resolved`） | 配置键和值保持原样，仅翻译前面的说明消息 |
+| 持久化日志、状态、调度槽位、归档索引和文件名 | 保持现有标准格式，不随显示语言变化 |
+| 服务器名称、路径及 SSH/rsync/ZIP 等外部命令输出 | 按原样保留，不翻译或重新解释 |
+
+语言选择只影响展示，不改变校验、同步及删除语义、归档保护、保留策略、重试、
+超时、调度或退出码。日志记录保留英文，兼容已有日志读取工具。中文状态视图会
+解释已知代码，例如 `失败 (FAILED)` 和 `SSH 主机密钥已变化 (HOST_KEY_CHANGED)`，
+但不会改写存储记录。未知字段和代码仍按原样显示。
+
+[英文文档](README.md)与[中文文档](README.zh.md)描述相同的运行行为。
+[`example.conf`](example.conf) 在一个模板中提供英文在前、中文在后的双语注释。
+脚本仍为单文件，不需要翻译框架或额外语言文件。
+
 ## 定时运行
 
 可以让 cron 每小时唤醒一次脚本，再由 `sync_hours` 判断当前小时是否需要执行：

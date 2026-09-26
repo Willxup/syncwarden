@@ -17,6 +17,7 @@ bash tests/run_tests.sh all
 ```bash
 bash tests/run_tests.sh parser
 bash tests/run_tests.sh cli
+bash tests/run_tests.sh i18n
 bash tests/run_tests.sh retention
 bash tests/run_tests.sh archive
 bash tests/run_tests.sh transport
@@ -52,3 +53,13 @@ bash tests/run_tests.sh integration
 - 状态持久化、定时槽位、锁和全局超时；
 - 多 source、多服务器顺序执行和失败隔离；
 - CLI 长短参数、简短帮助和只读查询边界。
+
+## 双语回归
+
+测试入口固定使用英文，避免继承调用者的 `SYNCWARDEN_LANG` 干扰断言。
+`i18n` 分组会显式覆盖语言，验证默认英文、中文及其别名、无效值回退、中文状态
+解释、格式字符与原始数据保留，以及帮助和查询的只读边界。
+
+该分组在固定时钟下逐字比较中英文运行的持久化日志和状态，并在中文模式下复用
+删除参数、重试、归档失败保护、成功/警告/失败退出码、定时去重及全局超时回归。
+切换语言不得改变备份功能或持久化格式。`all` 包含 `i18n`。

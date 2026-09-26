@@ -18,6 +18,7 @@ You can also run individual groups:
 ```bash
 bash tests/run_tests.sh parser
 bash tests/run_tests.sh cli
+bash tests/run_tests.sh i18n
 bash tests/run_tests.sh retention
 bash tests/run_tests.sh archive
 bash tests/run_tests.sh transport
@@ -52,3 +53,16 @@ The suite covers:
 - State persistence, schedule slots, locking, and global timeouts;
 - Sequential processing of multiple sources/servers and failure isolation;
 - Long/short CLI options, concise help, and read-only query boundaries.
+
+## Bilingual regression coverage
+
+The test entry point selects English explicitly so an inherited `SYNCWARDEN_LANG`
+does not affect assertions. The `i18n` group selects languages explicitly to test
+English defaults, Chinese and its aliases, fallback values, Chinese status
+explanations, literal format characters and user data, and read-only help/queries.
+
+With fixed clocks, it compares persisted logs and state byte-for-byte across
+languages. It also reuses deletion-argument, retry, archive-failure protection,
+success/warning/failure exit-code, schedule deduplication, and global-timeout
+regressions in Chinese mode. Language selection must not change backup behavior
+or persisted formats. The `all` group includes `i18n`.

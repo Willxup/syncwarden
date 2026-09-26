@@ -217,6 +217,51 @@ servers. For a dry run, the server ID must come first:
 syncwarden.sh sample-server --dry-run
 ```
 
+## Language
+
+English is the default for help, diagnostics, queries, and terminal summaries.
+Select Simplified Chinese explicitly with `SYNCWARDEN_LANG=zh`:
+
+```bash
+SYNCWARDEN_LANG=zh ./syncwarden.sh --help
+SYNCWARDEN_LANG=zh ./syncwarden.sh --list
+SYNCWARDEN_LANG=zh ./syncwarden.sh --status sample-server
+SYNCWARDEN_LANG=en ./syncwarden.sh sample-server --dry-run
+```
+
+The same setting applies to manual synchronization, archive-only runs, and
+scheduled runs. To keep Chinese for the current shell, use
+`export SYNCWARDEN_LANG=zh`. With sudo, pass the setting explicitly:
+
+```bash
+sudo env SYNCWARDEN_LANG=zh /opt/syncwarden/syncwarden.sh --check
+```
+
+`en` and `zh` are the recommended values. Chinese aliases `zh-CN`, `zh_CN`,
+`zh_CN.UTF-8`, and `zh_CN.utf8` are also accepted. An unset, empty, or unsupported
+value falls back to English. Host `LANG`/`LC_*` settings do not select the display
+language. Do not add a language key to the INI configuration.
+
+| Surface | Language behavior |
+| --- | --- |
+| Help, usage errors, configuration checks, and runtime diagnostics | English by default; Chinese when selected |
+| Server list, status query, dry-run headings, and run summaries | Localized labels and explanations; canonical status/reason codes remain visible |
+| Resolved configuration (`--show-resolved`) | Configuration keys and values remain unchanged; only the introductory message is localized |
+| Persisted logs, state, schedule slots, archive indexes, and filenames | Keep their existing canonical formats, independent of the display language |
+| Server names, paths, and external SSH/rsync/ZIP output | Preserved verbatim; not translated or reinterpreted |
+
+Language selection changes presentation only. It does not change validation,
+synchronization/deletion behavior, archive protection, retention, retries,
+timeouts, scheduling, or exit codes. Log records remain in English so existing
+log readers continue to work. Chinese status views explain known codes, for
+example `失败 (FAILED)` and `SSH 主机密钥已变化 (HOST_KEY_CHANGED)`, without rewriting
+stored records. Unknown fields and codes remain readable as-is.
+
+Both [English](README.md) and [Chinese](README.zh.md) documentation cover the
+same behavior. [`example.conf`](example.conf) keeps English-first bilingual
+comments in a single template. The script remains a single file and needs no
+translation framework or extra language files.
+
 ## Scheduled runs
 
 Cron can invoke the script every hour; `sync_hours` determines whether a
