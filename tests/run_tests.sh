@@ -3639,6 +3639,53 @@ test_localized_summaries_preserve_persisted_records() {
     assert_file_not_exists "$tmp/dry-home/state/last-status/one.status" 'translated dry-run writes no status'
 }
 
+test_archive_cleanup_failure_logs_are_language_independent() {
+    local tmp destination language rc old_epoch new_epoch old_path new_path log index
+    tmp=$(make_temp_dir)
+    destination="$tmp/payload"
+    mkdir -p "$destination/data"
+    printf 'mirror payload\n' >"$destination/data/file.txt"
+    old_epoch=$(date -d '2026-05-01 05:00:01 +0000' +%s)
+    new_epoch=$(date -d '2026-07-11 13:00:01 +0000' +%s)
+    old_path="$destination/$(archive_basename data "$old_epoch")"
+    new_path="$destination/$(archive_basename data "$new_epoch")"
+    for language in en zh; do
+        (
+            export SYNCWARDEN_LANG=$language SYNCWARDEN_RUN_ID=cleanup-i18n-regression
+            timestamp_now() { printf '%s\n' '2026-07-11 13:00:01 +00:00'; }
+            wall_now_epoch() { printf '%s\n' "$new_epoch"; }
+            prepare_archive_test "$tmp/$language/home" "$destination"
+            SERVER_SOURCES['sample-server:0']='/srv/data'
+            SERVER_VALUES['sample-server:archive_recent_keep']=1
+            SERVER_VALUES['sample-server:archive_monthly_keep']=1
+            create_indexed_archive sample-server data '2026-05-01 05:00:01 +0000' "$destination" >/dev/null
+            CHOWN_BIN=true
+            RM_BIN="$TEST_DIR/fakes/rm"
+            export FAKE_RM_MODE=fail FAKE_ZIP_MODE=success
+            run_archive_only sample-server >"$tmp/$language/console" 2>"$tmp/$language/stderr"
+        )
+        rc=$?
+        assert_eq '2' "$rc" "archive cleanup failure remains warning-only in $language"
+        assert_file_exists "$old_path" "failed deletion preserves the old archive in $language"
+        assert_file_exists "$new_path" "cleanup warning preserves the new verified archive in $language"
+        index=$(<"$tmp/$language/home/state/archive-index/sample-server.list")
+        assert_contains "$old_path" "$index" "failed deletion preserves the old archive index entry in $language"
+        assert_contains "$new_path" "$index" "new verified archive stays indexed in $language"
+        log=$(<"$tmp/$language/home/logs/failure-2026-07.log")
+        assert_contains "warning: failed to remove managed archive: $old_path" "$log" "persisted cleanup warning remains English in $language"
+        assert_contains 'fake rm: deletion refused' "$log" "external deletion diagnostic remains verbatim in $language"
+        assert_contains 'reason=WARNING_CLEANUP' "$(<"$tmp/$language/home/state/last-status/sample-server.status")" "cleanup reason code remains canonical in $language"
+        if [[ "$language" == zh ]]; then
+            assert_contains '警告 (WARNING)' "$(<"$tmp/zh/console")" 'Chinese archive summary stays localized after cleanup failure'
+        fi
+        # Reset only this test's new ZIP so both runs use identical archive paths.
+        rm -f -- "$new_path"
+    done
+    assert_eq "$(<"$tmp/en/home/logs/failure-2026-07.log")" "$(<"$tmp/zh/home/logs/failure-2026-07.log")" 'cleanup failure logs are byte-identical across languages with fixed clocks and paths'
+    assert_eq "$(<"$tmp/en/home/state/last-status/sample-server.status")" "$(<"$tmp/zh/home/state/last-status/sample-server.status")" 'cleanup warning state is identical across languages'
+    assert_eq "$(<"$tmp/en/home/state/archive-index/sample-server.list")" "$(<"$tmp/zh/home/state/archive-index/sample-server.list")" 'cleanup failure retains identical archive indexes across languages'
+}
+
 test_chinese_status_explains_codes_without_rewriting_state() {
     local tmp before output rc
     tmp=$(make_temp_dir)
@@ -3683,6 +3730,7 @@ run_i18n_suite() {
     test_localized_configuration_errors_preserve_canonical_reason
     test_localized_runtime_guards_keep_failure_semantics
     test_localized_summaries_preserve_persisted_records
+    test_archive_cleanup_failure_logs_are_language_independent
     test_chinese_status_explains_codes_without_rewriting_state
     test_chinese_mode_keeps_engine_guards
 }

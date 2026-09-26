@@ -100,7 +100,6 @@ ui_printf() {
             "private key error: server '%s' key must be a readable regular non-symlink file: %s\\n") format="私钥错误：服务器 '%s' 的私钥必须是可读的普通文件且不是符号链接：%s\\n" ;;
             "private key error: cannot read permissions for server '%s': %s\\n") format="私钥错误：无法读取服务器 '%s' 的私钥权限：%s\\n" ;;
             "private key permissions are unsafe for server '%s': %s is mode %s; group/other access must be 00\\n") format="服务器 '%s' 的私钥权限不安全：%s 的权限为 %s；组和其他用户的权限必须为 00\\n" ;;
-            'warning: failed to remove managed archive: %s\n') format='警告：无法删除受管归档：%s\n' ;;
             'capacity error: no existing filesystem ancestor for %s\n') format='容量错误：%s 没有已存在的文件系统上级路径\n' ;;
             'capacity error: free-space check timed out for %s\n') format='容量错误：%s 的可用空间检查超时\n' ;;
             'capacity error: unable to read free space for %s\n') format='容量错误：无法读取 %s 的可用空间\n' ;;
@@ -1394,7 +1393,9 @@ cleanup_archives() {
         if run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" "$RM_BIN" -f -- "$path"; then
             :
         else
-            ui_printf 'warning: failed to remove managed archive: %s\n' "$path" >&2
+            # archive_source captures this diagnostic as persisted RAW OUTPUT.
+            # Keep it canonical; the terminal summary is localized separately.
+            printf 'warning: failed to remove managed archive: %s\n' "$path" >&2
             delete_failed=1
             printf '%s|%s|%s|%s\n' "$epoch" "$month" "$sha" "$path" >>"$temp_file" || {
                 discard_temp_file "$temp_file"
