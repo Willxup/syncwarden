@@ -1065,7 +1065,7 @@ print_server_list() {
     local id
     printf '%-20s %-18s %s\n' 'ID' "$(ui_printf 'SCHEDULED')" "$(ui_printf 'NAME')"
     for id in "${SERVER_IDS[@]}"; do
-        printf '%-20s %-18s %s\n' "$id" "$(resolve_value "$id" scheduled_sync_enabled)" "$(resolve_value "$id" name)"
+        printf '%-20s %-18s %s\n' "$id" "$(ui_code "$(resolve_value "$id" scheduled_sync_enabled)")" "$(resolve_value "$id" name)"
     done
 }
 

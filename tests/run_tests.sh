@@ -3511,7 +3511,10 @@ test_localized_cli_keeps_arguments_and_query_data() {
     assert_eq "${english#*$'\n'}" "${chinese#*$'\n'}" 'resolved configuration stays identical across languages'
     output=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" --list)
     assert_contains '定时同步' "$output" 'server list header is translated'
+    assert_contains '是 (yes)' "$output" 'scheduled participation is explained without dropping its code'
     assert_contains 'Sample-Server' "$output" 'server display name is preserved'
+    output=$(load_config "$CLI_FIXTURE_CONFIG"; SERVER_VALUES['backup-node:scheduled_sync_enabled']=no; SYNCWARDEN_LANG=zh print_server_list)
+    assert_contains '否 (no)' "$output" 'disabled participation is explained without dropping its code'
     output=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" --status sample-server)
     assert_contains '尚无状态记录' "$output" 'missing status message is translated'
     assert_file_not_exists "$tmp/home" 'translated queries and usage errors do not initialize runtime files'
