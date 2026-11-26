@@ -9,6 +9,8 @@ set -uo pipefail
 
 # Keep date formatting deterministic and avoid inheriting the host timezone.
 export TZ=UTC
+# Tests choose presentation languages explicitly instead of inheriting the caller.
+export SYNCWARDEN_LANG=en
 
 TEST_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 PROJECT_DIR=$(cd -- "$TEST_DIR/.." && pwd -P)
@@ -681,17 +683,17 @@ test_public_example_uses_approved_retention_policy() {
     assert_not_contains 'server_timeout_seconds=' "$content" 'public example has no shared server deadline'
 }
 
-test_public_docs_are_chinese_and_project_shaped() {
+test_public_docs_are_bilingual_and_project_shaped() {
     local readme example test_readme heading
     local -a headings=(
-        '## 核心特性'
-        '## 工作原理'
-        '## 快速开始'
-        '## 配置说明'
-        '## 命令'
-        '## 安全模型'
-        '## 常见问题'
-        '## 许可证'
+        '## Features'
+        '## How it works'
+        '## Quick start'
+        '## Configuration'
+        '## Commands'
+        '## Safety model'
+        '## FAQ'
+        '## License'
     )
 
     readme=$(<"$PROJECT_DIR/README.md")
@@ -701,12 +703,14 @@ test_public_docs_are_chinese_and_project_shaped() {
     for heading in "${headings[@]}"; do
         assert_contains "$heading" "$readme" "README contains project section '$heading'"
     done
-    assert_not_contains 'README.zh.md' "$readme" 'single-language README has no alternate-language link'
-    assert_not_contains 'Reliable backups' "$readme" 'project introduction is written in Chinese'
-    assert_contains 'SyncWarden 公开示例配置' "$example" 'public example has a Chinese title'
-    assert_not_contains 'SyncWarden Public Example Configuration' "$example" 'public example removes the English title'
-    assert_contains '## 运行测试' "$test_readme" 'test documentation has a Chinese run section'
-    assert_not_contains '# SyncWarden test suite' "$test_readme" 'test documentation removes the English title'
+    assert_contains '[简体中文](README.zh.md)' "$readme" 'English README links to Chinese documentation'
+    assert_contains '[English](README.md)' "$(<"$PROJECT_DIR/README.zh.md")" 'Chinese README links to English documentation'
+    assert_contains '## 安全模型' "$(<"$PROJECT_DIR/README.zh.md")" 'Chinese README retains safety documentation'
+    assert_contains 'SyncWarden Public Example Configuration' "$example" 'public example includes English instructions'
+    assert_contains 'SyncWarden 公开示例配置' "$example" 'public example retains Chinese instructions'
+    assert_contains '## Running tests' "$test_readme" 'test documentation defaults to English'
+    assert_contains '[简体中文](README.zh.md)' "$test_readme" 'test documentation links to Chinese'
+    assert_contains '[English](README.md)' "$(<"$PROJECT_DIR/tests/README.zh.md")" 'Chinese test documentation links to English'
 }
 
 run_parser_suite() {
@@ -738,7 +742,7 @@ run_parser_suite() {
     test_parser_rejects_cross_server_nested_managed_paths
     test_parser_rejects_control_and_system_destinations
     test_public_example_uses_approved_retention_policy
-    test_public_docs_are_chinese_and_project_shaped
+    test_public_docs_are_bilingual_and_project_shaped
 }
 
 run_cli_command() {
@@ -758,7 +762,7 @@ test_help_is_concise_and_has_no_side_effects() {
     assert_eq '0' "$short_rc" '-h returns zero without a config'
     assert_eq '0' "$long_rc" '--help returns zero without a config'
     assert_eq "$short" "$long" 'short and long help are identical'
-    assert_contains '用法' "$long" 'help presents command usage'
+    assert_contains 'Usage:' "$long" 'help presents command usage'
     assert_contains 'syncwarden.sh sample-server' "$long" 'help shows a manual synchronization example'
     assert_contains 'syncwarden.sh sample-server --dry-run' "$long" 'help shows a dry-run example'
     assert_contains 'syncwarden.sh --archive SERVER_ID' "$long" 'help lists archive-only mode'
@@ -770,10 +774,10 @@ test_help_is_concise_and_has_no_side_effects() {
     assert_contains "$tmp/missing.conf" "$long" 'help displays the active configuration path'
     assert_not_contains 'known_hosts' "$long" 'help leaves SSH host-key details in the README'
     assert_not_contains '05h00m00s' "$long" 'help leaves timeout details in the README'
-    assert_not_contains '退出码' "$long" 'help leaves exit-code details in the README'
+    assert_not_contains 'Exit codes' "$long" 'help leaves exit-code details in the README'
     assert_not_contains 'success-YYYY-MM.log' "$long" 'help leaves log-layout details in the README'
-    assert_not_contains '服务器配置要点' "$long" 'help leaves configuration rules in the README'
-    assert_not_contains 'dry-run 边界' "$long" 'help leaves dry-run boundaries in the README'
+    assert_not_contains 'Server configuration' "$long" 'help leaves configuration rules in the README'
+    assert_not_contains 'Dry-run boundaries' "$long" 'help leaves dry-run boundaries in the README'
     assert_not_contains '/opt/syncwarden' "$long" 'help contains no fixed deployment control path'
     line_count=$(printf '%s\n' "$long" | wc -l)
     if (( line_count <= 40 )); then
@@ -2774,7 +2778,7 @@ test_global_timeout_constants_and_single_wrapper() {
     assert_contains 'ARG=--help' "$content" 'global wrapper preserves original CLI arguments'
     assert_contains 'SyncWarden -' "$output" 'wrapped help still reaches the normal command dispatcher'
     assert_not_contains '05h00m00s' "$output" 'CLI help leaves the global runtime details in the README'
-    assert_not_contains '退出码' "$output" 'CLI help leaves exit-code documentation in the README'
+    assert_not_contains 'Exit codes' "$output" 'CLI help leaves exit-code documentation in the README'
 }
 
 test_manual_global_timeout_logs_and_cleans_up() {
@@ -2959,6 +2963,7 @@ test_cli_lock_contention_returns_75() {
 }
 
 test_scheduled_cli_noop_and_due_state() {
+    local not_due_text=${1:-'No SyncWarden task is due'} completed_text=${2:-'already completed'}
     local tmp config payload rc output state_file state_content args first_count second_count
     tmp=$(make_temp_dir)
     config="$tmp/integration.conf"
@@ -2975,7 +2980,7 @@ test_scheduled_cli_noop_and_due_state() {
     output=$(run_integration_cli "$tmp/home" "$config" --scheduled 2>&1)
     rc=$?
     assert_eq '0' "$rc" 'unconfigured scheduled hour exits zero'
-    assert_contains 'No SyncWarden task is due' "$output" 'unconfigured hour explains no-op'
+    assert_contains "$not_due_text" "$output" 'unconfigured hour explains no-op'
     assert_file_not_exists "$FAKE_RSYNC_ARGS_FILE" 'unconfigured hour invokes no rsync'
 
     SYNCWARDEN_NOW_HOUR=3
@@ -3001,7 +3006,7 @@ test_scheduled_cli_noop_and_due_state() {
     rc=$?
     second_count=$(wc -l <"$FAKE_RSYNC_ARGS_FILE")
     assert_eq '0' "$rc" 'repeated invocation of the same schedule slot is a safe no-op'
-    assert_contains 'already completed' "$output" 'repeated schedule slot explains why it was skipped'
+    assert_contains "$completed_text" "$output" 'repeated schedule slot explains why it was skipped'
     assert_eq "$first_count" "$second_count" 'repeated schedule slot does not invoke rsync again'
 }
 
@@ -3052,7 +3057,7 @@ test_dry_run_prints_failure_reason_without_writing_failure_log() {
 }
 
 test_archive_only_cli_writes_styled_log_and_status() {
-    local tmp config payload rc success_content status_content
+    local tmp config payload rc success_content status_content output
     tmp=$(make_temp_dir)
     config="$tmp/integration.conf"
     payload="$tmp/payload"
@@ -3063,9 +3068,10 @@ test_archive_only_cli_writes_styled_log_and_status() {
     FAKE_ZIP_MODE=success
     SYNCWARDEN_NOW_EPOCH=$(date -d '2026-07-11 18:42:16 +0000' +%s)
     export FAKE_ZIP_MODE SYNCWARDEN_NOW_EPOCH
-    run_integration_cli "$tmp/home" "$config" --archive one >/dev/null
+    output=$(run_integration_cli "$tmp/home" "$config" --archive one)
     rc=$?
     assert_eq '0' "$rc" 'archive-only CLI succeeds'
+    assert_contains "${1:-SUMMARY}" "$output" 'archive-only displays the requested language summary'
     success_content=$(<"$tmp/home/logs/success-2026-07.log")
     assert_contains 'ARCHIVE ONLY' "$success_content" 'archive-only success is logged with its mode'
     assert_contains '================================================================================' "$success_content" 'archive-only log has visible separators'
@@ -3453,6 +3459,282 @@ run_log_suite() {
     FIND_BIN=$(command -v find)
 }
 
+test_language_selection_and_help_are_read_only() {
+    local tmp language output default_help rc
+    tmp=$(make_temp_dir)
+    default_help=$(env -u SYNCWARDEN_LANG LANG=zh_CN.UTF-8 SYNCWARDEN_LIB_MODE=0 \
+        SYNCWARDEN_HOME="$tmp/home" SYNCWARDEN_CONFIG="$tmp/missing.conf" "$SCRIPT_PATH" --help)
+    assert_contains 'Usage:' "$default_help" 'help defaults to English even under a Chinese host locale'
+    for language in en '' fr invalid; do
+        output=$(SYNCWARDEN_LANG="$language" SYNCWARDEN_LIB_MODE=0 SYNCWARDEN_HOME="$tmp/home" \
+            SYNCWARDEN_CONFIG="$tmp/missing.conf" "$SCRIPT_PATH" --help)
+        rc=$?
+        assert_eq '0' "$rc" "English fallback '$language' preserves help exit status"
+        assert_eq "$default_help" "$output" "language '$language' uses English help"
+    done
+    for language in zh zh-CN zh_CN zh_CN.UTF-8 zh_CN.utf8; do
+        output=$(SYNCWARDEN_LANG="$language" SYNCWARDEN_LIB_MODE=0 SYNCWARDEN_HOME="$tmp/home" \
+            SYNCWARDEN_CONFIG="$tmp/missing.conf" "$SCRIPT_PATH" --help)
+        rc=$?
+        assert_eq '0' "$rc" "Chinese alias '$language' preserves help exit status"
+        assert_contains '用法：' "$output" "Chinese alias '$language' selects Chinese help"
+        assert_contains 'README.zh.md' "$output" 'Chinese help links to Chinese documentation'
+    done
+    output=$(SYNCWARDEN_LANG=zh SYNCWARDEN_LIB_MODE=0 SYNCWARDEN_HOME="$tmp/home" \
+        SYNCWARDEN_CONFIG="$tmp/missing.conf" "$SCRIPT_PATH" 2>&1)
+    rc=$?
+    assert_eq '64' "$rc" 'Chinese no-argument usage preserves exit code 64'
+    assert_contains '用法：' "$output" 'brief usage supports Chinese'
+    assert_file_not_exists "$tmp/home" 'language selection and help create no control directory'
+}
+
+test_localized_cli_keeps_arguments_and_query_data() {
+    local tmp output english chinese rc args
+    local -a command_args=()
+    tmp=$(make_temp_dir)
+    for args in '--help extra' '--dry-run' '--show-resolved' '--check unexpected' '--list extra' '--status' '--unknown'; do
+        # All entries above are fixed test tokens, never user input.
+        read -r -a command_args <<<"$args"
+        english=$(SYNCWARDEN_LANG=en run_cli_command "$tmp/home" "${command_args[@]}" 2>&1)
+        rc=$?
+        assert_eq '64' "$rc" "English usage error keeps exit code: $args"
+        chinese=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" "${command_args[@]}" 2>&1)
+        rc=$?
+        assert_eq '64' "$rc" "Chinese usage error keeps exit code: $args"
+        if [[ "$english" != "$chinese" ]]; then
+            pass "usage error is translated: $args"
+        else
+            fail "usage error must be translated: $args"
+        fi
+    done
+    english=$(SYNCWARDEN_LANG=en run_cli_command "$tmp/home" --check --show-resolved)
+    chinese=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" --check --show-resolved)
+    assert_contains '配置检查通过' "$chinese" 'check success is translated'
+    assert_eq "${english#*$'\n'}" "${chinese#*$'\n'}" 'resolved configuration stays identical across languages'
+    output=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" --list)
+    assert_contains '定时同步' "$output" 'server list header is translated'
+    assert_contains '是 (yes)' "$output" 'scheduled participation is explained without dropping its code'
+    assert_contains 'Sample-Server' "$output" 'server display name is preserved'
+    output=$(load_config "$CLI_FIXTURE_CONFIG"; SERVER_VALUES['backup-node:scheduled_sync_enabled']=no; SYNCWARDEN_LANG=zh print_server_list)
+    assert_contains '否 (no)' "$output" 'disabled participation is explained without dropping its code'
+    output=$(SYNCWARDEN_LANG=zh run_cli_command "$tmp/home" --status sample-server)
+    assert_contains '尚无状态记录' "$output" 'missing status message is translated'
+    assert_file_not_exists "$tmp/home" 'translated queries and usage errors do not initialize runtime files'
+    output=$(SYNCWARDEN_LANG=zh ui_printf 'unknown option: %s\n' '%s\\n$(touch should-not-exist)')
+    assert_eq '未知选项：%s\\n$(touch should-not-exist)' "$output" 'message data is printed literally, never interpreted as format or shell code'
+}
+
+test_localized_configuration_errors_preserve_canonical_reason() {
+    local tmp language expected_reason='' rc english_reason SYNCWARDEN_LANG
+    tmp=$(make_temp_dir)
+    for language in en zh; do
+        SYNCWARDEN_LANG=$language
+        load_config "$tmp/missing-%s.conf" >"$tmp/$language.out" 2>&1
+        rc=$?
+        assert_eq '1' "$rc" 'unreadable configuration fails in either language'
+        if [[ "$language" == en ]]; then
+            expected_reason=$LAST_CONFIG_ERROR
+        else
+            assert_eq "$expected_reason" "$LAST_CONFIG_ERROR" 'stored configuration reason remains canonical English'
+            assert_contains '配置文件不可读' "$(<"$tmp/zh.out")" 'configuration error details are translated'
+            assert_contains 'missing-%s.conf' "$(<"$tmp/zh.out")" 'percent signs in paths remain literal'
+        fi
+    done
+    printf '[unexpected]\n' >"$tmp/invalid.conf"
+    SYNCWARDEN_LANG=en load_config "$tmp/invalid.conf" >"$tmp/en.out" 2>&1
+    english_reason=$LAST_CONFIG_ERROR
+    SYNCWARDEN_LANG=zh load_config "$tmp/invalid.conf" >"$tmp/zh.out" 2>&1
+    assert_eq "$english_reason" "$LAST_CONFIG_ERROR" 'parser section errors retain the same stored reason'
+    assert_contains "第 1 行：未知分节：'unexpected'" "$(<"$tmp/zh.out")" 'parser keeps line number and section data in Chinese'
+    load_config "$FIXTURE_DIR/base.conf"
+    SERVER_SOURCES['sample-server:0']='relative'
+    SYNCWARDEN_LANG=en validate_config >"$tmp/en.out" 2>&1
+    english_reason=$LAST_CONFIG_ERROR
+    LAST_CONFIG_ERROR=''
+    SYNCWARDEN_LANG=zh validate_config >"$tmp/zh.out" 2>&1
+    assert_eq "$english_reason" "$LAST_CONFIG_ERROR" 'validation retains the same stored reason'
+    assert_contains '远程 source 必须是绝对路径' "$(<"$tmp/zh.out")" 'path validation details are translated'
+}
+
+test_localized_runtime_guards_keep_failure_semantics() {
+    local tmp language rc expected_warning='' SYNCWARDEN_LANG
+    tmp=$(make_temp_dir)
+    mkdir -p "$tmp/payload"
+    prepare_transport_test "$tmp/home" "$tmp/payload"
+    DF_BIN="$TEST_DIR/fakes/df"
+    FAKE_DF_AVAILABLE_MB=0
+    export FAKE_DF_AVAILABLE_MB
+    for language in en zh; do
+        SYNCWARDEN_LANG=$language
+        check_destination_capacity sample-server >"$tmp/$language.out" 2>&1
+        rc=$?
+        assert_eq '1' "$rc" 'capacity guard fails in either language'
+        assert_eq 'LOW_FREE_SPACE' "$LAST_CAPACITY_REASON" 'capacity failure classification is language-independent'
+        if [[ "$language" == zh ]]; then
+            assert_contains '容量错误' "$(<"$tmp/zh.out")" 'capacity diagnostic is translated'
+        fi
+        LOG_MAINTENANCE_MESSAGES=''
+        log_maintenance_warn 'rotated log already exists; source preserved: %s' '/tmp/原始-%s.log' >"$tmp/$language.warn" 2>&1
+        if [[ "$language" == en ]]; then
+            expected_warning=$LOG_MAINTENANCE_MESSAGES
+        else
+            assert_eq "$expected_warning" "$LOG_MAINTENANCE_MESSAGES" 'persisted maintenance warning stays canonical'
+            assert_contains '保留原文件：/tmp/原始-%s.log' "$(<"$tmp/zh.warn")" 'translated maintenance warning preserves user data'
+        fi
+    done
+    unset FAKE_DF_AVAILABLE_MB
+    DF_BIN=$(command -v df)
+    SERVER_VALUES['sample-server:key_file']="$tmp/missing-key"
+    SYNCWARDEN_LANG=zh check_private_key sample-server >"$tmp/key.out" 2>&1
+    rc=$?
+    assert_eq '1' "$rc" 'Chinese private key check preserves failure status'
+    assert_contains '私钥错误' "$(<"$tmp/key.out")" 'private key guard is translated'
+}
+
+test_localized_summaries_preserve_persisted_records() {
+    local tmp language rc content
+    tmp=$(make_temp_dir)
+    for language in en zh; do
+        (
+            export SYNCWARDEN_LANG=$language SYNCWARDEN_RUN_ID=language-regression
+            export SYNCWARDEN_NOW_EPOCH=1783846800
+            timestamp_now() { printf '%s\n' '2026-07-12 09:00:00 +00:00'; }
+            wall_now_epoch() { printf '%s\n' '1783846800'; }
+            transfer_timer_now_us() { printf '%s\n' '1000000'; }
+            mkdir -p "$tmp/$language/payload/one/data"
+            write_orchestration_config "$tmp/$language/config" "$tmp/$language/payload"
+            prepare_orchestration_test "$tmp/$language/home" "$tmp/$language/config"
+            SERVER_VALUES['one:name']='Time: 原始名称 %s'
+            export FAKE_SSH_MODE=success FAKE_RSYNC_MODE=vanished
+            unset FAKE_SSH_FAIL_HOST FAKE_RSYNC_FAIL_HOST FAKE_RSYNC_MODE_SEQUENCE
+            export FAKE_RSYNC_OUTPUT='__SYNCWARDEN_CHANGE__:>f+++++++++|1024'
+            run_batch MANUAL 0 one >"$tmp/$language/output"
+        )
+        rc=$?
+        assert_eq '0' "$rc" "code 24 retains successful batch semantics in $language"
+        assert_file_not_exists "$tmp/$language/home/logs/failure-2026-07.log" 'code 24 creates no failure log in either language'
+    done
+    assert_contains 'SUMMARY' "$(<"$tmp/en/output")" 'English summary keeps original presentation'
+    content=$(<"$tmp/zh/output")
+    assert_contains '汇总' "$content" 'Chinese batch summary is translated'
+    assert_contains '传输量=' "$content" 'Chinese server result labels are translated'
+    assert_contains 'Time: 原始名称 %s' "$content" 'translated summaries preserve arbitrary display names'
+    assert_eq "$(<"$tmp/en/home/logs/success-2026-07.log")" "$(<"$tmp/zh/home/logs/success-2026-07.log")" 'persisted success logs are byte-identical across languages with fixed clocks'
+    assert_eq "$(<"$tmp/en/home/state/last-status/one.status")" "$(<"$tmp/zh/home/state/last-status/one.status")" 'persisted state is byte-identical across languages with fixed clocks'
+    (
+        export SYNCWARDEN_LANG=zh
+        write_orchestration_config "$tmp/dry-config" "$tmp/zh/payload"
+        export FAKE_SSH_MODE=host-key FAKE_RSYNC_MODE=success
+        unset FAKE_SSH_FAIL_HOST FAKE_RSYNC_FAIL_HOST
+        run_integration_cli "$tmp/dry-home" "$tmp/dry-config" one --dry-run >"$tmp/dry-output" 2>&1
+    )
+    rc=$?
+    assert_eq '1' "$rc" 'translated dry-run failure keeps its exit status'
+    content=$(<"$tmp/dry-output")
+    assert_contains '失败 - One' "$content" 'dry-run failure title is translated'
+    assert_contains '原始输出' "$content" 'dry-run raw-output heading is translated'
+    assert_contains 'HOST_KEY_CHANGED' "$content" 'failure reason codes remain stable'
+    assert_contains 'REMOTE HOST IDENTIFICATION HAS CHANGED' "$content" 'external SSH diagnostics remain verbatim'
+    assert_file_not_exists "$tmp/dry-home/logs/failure-2026-07.log" 'translated dry-run writes no failure log'
+    assert_file_not_exists "$tmp/dry-home/state/last-status/one.status" 'translated dry-run writes no status'
+}
+
+test_archive_cleanup_failure_logs_are_language_independent() {
+    local tmp destination language rc old_epoch new_epoch old_path new_path log index
+    tmp=$(make_temp_dir)
+    destination="$tmp/payload"
+    mkdir -p "$destination/data"
+    printf 'mirror payload\n' >"$destination/data/file.txt"
+    old_epoch=$(date -d '2026-05-01 05:00:01 +0000' +%s)
+    new_epoch=$(date -d '2026-07-11 13:00:01 +0000' +%s)
+    old_path="$destination/$(archive_basename data "$old_epoch")"
+    new_path="$destination/$(archive_basename data "$new_epoch")"
+    for language in en zh; do
+        (
+            export SYNCWARDEN_LANG=$language SYNCWARDEN_RUN_ID=cleanup-i18n-regression
+            timestamp_now() { printf '%s\n' '2026-07-11 13:00:01 +00:00'; }
+            wall_now_epoch() { printf '%s\n' "$new_epoch"; }
+            prepare_archive_test "$tmp/$language/home" "$destination"
+            SERVER_SOURCES['sample-server:0']='/srv/data'
+            SERVER_VALUES['sample-server:archive_recent_keep']=1
+            SERVER_VALUES['sample-server:archive_monthly_keep']=1
+            create_indexed_archive sample-server data '2026-05-01 05:00:01 +0000' "$destination" >/dev/null
+            CHOWN_BIN=true
+            RM_BIN="$TEST_DIR/fakes/rm"
+            export FAKE_RM_MODE=fail FAKE_ZIP_MODE=success
+            run_archive_only sample-server >"$tmp/$language/console" 2>"$tmp/$language/stderr"
+        )
+        rc=$?
+        assert_eq '2' "$rc" "archive cleanup failure remains warning-only in $language"
+        assert_file_exists "$old_path" "failed deletion preserves the old archive in $language"
+        assert_file_exists "$new_path" "cleanup warning preserves the new verified archive in $language"
+        index=$(<"$tmp/$language/home/state/archive-index/sample-server.list")
+        assert_contains "$old_path" "$index" "failed deletion preserves the old archive index entry in $language"
+        assert_contains "$new_path" "$index" "new verified archive stays indexed in $language"
+        log=$(<"$tmp/$language/home/logs/failure-2026-07.log")
+        assert_contains "warning: failed to remove managed archive: $old_path" "$log" "persisted cleanup warning remains English in $language"
+        assert_contains 'fake rm: deletion refused' "$log" "external deletion diagnostic remains verbatim in $language"
+        assert_contains 'reason=WARNING_CLEANUP' "$(<"$tmp/$language/home/state/last-status/sample-server.status")" "cleanup reason code remains canonical in $language"
+        if [[ "$language" == zh ]]; then
+            assert_contains '警告 (WARNING)' "$(<"$tmp/zh/console")" 'Chinese archive summary stays localized after cleanup failure'
+        fi
+        # Reset only this test's new ZIP so both runs use identical archive paths.
+        rm -f -- "$new_path"
+    done
+    assert_eq "$(<"$tmp/en/home/logs/failure-2026-07.log")" "$(<"$tmp/zh/home/logs/failure-2026-07.log")" 'cleanup failure logs are byte-identical across languages with fixed clocks and paths'
+    assert_eq "$(<"$tmp/en/home/state/last-status/sample-server.status")" "$(<"$tmp/zh/home/state/last-status/sample-server.status")" 'cleanup warning state is identical across languages'
+    assert_eq "$(<"$tmp/en/home/state/archive-index/sample-server.list")" "$(<"$tmp/zh/home/state/archive-index/sample-server.list")" 'cleanup failure retains identical archive indexes across languages'
+}
+
+test_chinese_status_explains_codes_without_rewriting_state() {
+    local tmp before output rc
+    tmp=$(make_temp_dir)
+    configure_home_paths "$tmp/home"
+    ensure_home_layout
+    load_config "$FIXTURE_DIR/base.conf"
+    before=$'time=2026-07-12 09:00:00 +00:00\nstatus=FAILED\nmode=MANUAL\nreason=HOST_KEY_CHANGED\nexit_code=1\nchange_complete=no\nfuture_field=%s\\n\nunknown-line'
+    printf '%s\n' "$before" >"$LAST_STATUS_DIR/sample-server.status"
+    output=$(SYNCWARDEN_LANG=zh print_status sample-server)
+    rc=$?
+    assert_eq '0' "$rc" 'Chinese status query keeps its exit code'
+    assert_contains '状态 (status): 失败 (FAILED)' "$output" 'status shows both Chinese meaning and stable code'
+    assert_contains '原因 (reason): SSH 主机密钥已变化 (HOST_KEY_CHANGED)' "$output" 'status explains failure codes in Chinese'
+    assert_contains 'future_field=%s\n' "$output" 'unknown future state fields remain literal'
+    assert_contains 'unknown-line' "$output" 'unrecognized state lines are preserved'
+    assert_eq "$before" "$(<"$LAST_STATUS_DIR/sample-server.status")" 'localized status never rewrites the state file'
+    output=$(SYNCWARDEN_LANG=en print_status sample-server)
+    assert_eq "$(printf 'Status for sample-server:\n'; sed 's/^/  /' "$LAST_STATUS_DIR/sample-server.status")" "$output" 'English status preserves its original byte format'
+    assert_eq '未识别 %s' "$(SYNCWARDEN_LANG=zh ui_code '未识别 %s')" 'unknown codes are preserved literally'
+    assert_eq '不可用 (unavailable)' "$(SYNCWARDEN_LANG=zh ui_code unavailable)" 'non-numeric metric states have Chinese explanations'
+}
+
+test_chinese_mode_keeps_engine_guards() {
+    local SYNCWARDEN_LANG=zh
+    # Reuse behavioral assertions against the Chinese execution path. These check
+    # external command arguments, return codes, persisted records, and side effects.
+    test_sync_command_preserves_mirror_semantics
+    test_sync_transient_retry_and_permanent_failure
+    test_archive_verification_failure_leaves_no_artifact_or_index
+    test_archive_failure_blocks_only_that_server_sync
+    FAKE_ZIP_MODE=success
+    test_batch_exit_codes_success_and_warning
+    test_archive_only_cli_writes_styled_log_and_status '汇总'
+    test_scheduled_cli_noop_and_due_state '当前小时没有到期' '调度时段已完成'
+    test_manual_global_timeout_logs_and_cleans_up
+    test_dry_run_global_timeout_preserves_zero_write
+}
+
+run_i18n_suite() {
+    test_language_selection_and_help_are_read_only
+    test_localized_cli_keeps_arguments_and_query_data
+    test_localized_configuration_errors_preserve_canonical_reason
+    test_localized_runtime_guards_keep_failure_semantics
+    test_localized_summaries_preserve_persisted_records
+    test_archive_cleanup_failure_logs_are_language_independent
+    test_chinese_status_explains_codes_without_rewriting_state
+    test_chinese_mode_keeps_engine_guards
+}
+
 if [[ ! -r "$SCRIPT_PATH" ]]; then
     printf 'FAIL: production script is missing: %s\n' "$SCRIPT_PATH" >&2
     exit 1
@@ -3465,6 +3747,7 @@ source "$SCRIPT_PATH"
 case "$CURRENT_SUITE" in
     parser) run_parser_suite ;;
     cli) run_cli_suite ;;
+    i18n) run_i18n_suite ;;
     retention) run_retention_suite ;;
     archive) run_archive_suite ;;
     transport) run_transport_suite ;;
@@ -3480,6 +3763,7 @@ case "$CURRENT_SUITE" in
         run_orchestration_suite
         run_log_suite
         run_integration_suite
+        run_i18n_suite
         ;;
     *) printf 'Unknown suite: %s\n' "$CURRENT_SUITE" >&2; exit 64 ;;
 esac

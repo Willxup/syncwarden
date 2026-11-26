@@ -1,7 +1,258 @@
 #!/usr/bin/env bash
 
+# Only explicit selection changes the presentation language. Host locales do not.
+# Keep this bootstrap compatible with older Bash so the version error is readable.
+use_chinese() {
+    case "${SYNCWARDEN_LANG:-en}" in
+        zh|zh-CN|zh_CN|zh_CN.UTF-8|zh_CN.utf8) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Translate constant format strings only; user data is always passed as arguments.
+# Internal values and persisted records never pass through this function.
+ui_printf() {
+    local format=$1
+    shift
+    if use_chinese; then
+        case "$format" in
+            'SyncWarden requires Bash 5 or newer; found %s.\n') format='SyncWarden 需要 Bash 5 或更高版本；当前版本为 %s。\n' ;;
+            'Usage:\n') format='用法：\n' ;;
+            'help does not accept additional arguments\n') format='帮助命令不接受额外参数\n' ;;
+            'dry-run requires a configured SERVER_ID before %s\n') format='执行 dry-run 时，必须在 %s 前指定已配置的 SERVER_ID\n' ;;
+            '%s is only valid after -c or --check\n') format='%s 仅能用于 -c 或 --check 之后\n' ;;
+            'too many arguments for check\n') format='配置检查的参数过多\n' ;;
+            'unknown check option: %s\n') format='未知的配置检查选项：%s\n' ;;
+            'SyncWarden configuration OK: %d server(s)\n') format='SyncWarden 配置检查通过：%d 台服务器\n' ;;
+            '%s does not accept additional arguments\n') format='%s 不接受额外参数\n' ;;
+            'usage: syncwarden.sh %s SERVER_ID\n') format='用法：syncwarden.sh %s SERVER_ID\n' ;;
+            'unknown server ID: %s\n') format='未知的服务器 ID：%s\n' ;;
+            'No SyncWarden task is due at this hour.\n') format='当前小时没有到期的 SyncWarden 任务。\n' ;;
+            'This SyncWarden schedule slot is already completed: %s\n') format='此 SyncWarden 调度时段已完成：%s\n' ;;
+            'No servers are configured for scheduled synchronization.\n') format='没有配置参与定时同步的服务器。\n' ;;
+            'unknown option: %s\n') format='未知选项：%s\n' ;;
+            'unknown argument for server %s: %s\n') format='服务器 %s 的参数未知：%s\n' ;;
+            'too many arguments\n') format='参数过多\n' ;;
+            '%s: no recorded status\n') format='%s：尚无状态记录\n' ;;
+            'Status for %s:\n') format='%s 的状态：\n' ;;
+            'SyncWarden is already running (lock: %s)\n') format='SyncWarden 已在运行（锁文件：%s）\n' ;;
+            'required command not found: timeout\n') format='未找到必需命令：timeout\n' ;;
+            'SyncWarden global runtime limit exceeded: %s; mode=%s; reason=GLOBAL_TIMEOUT\n') format='SyncWarden 已超过全局运行时限：%s；模式=%s；原因=GLOBAL_TIMEOUT\n' ;;
+            SCHEDULED) format='定时同步' ;;
+            NAME) format='名称' ;;
+            'configuration error: %s\n') format='配置错误：%s\n' ;;
+            'config file is not readable: %s') format='配置文件不可读：%s' ;;
+            "line %s: invalid server ID '%s'") format="第 %s 行：服务器 ID 无效：'%s'" ;;
+            "line %s: duplicate server section '%s'") format="第 %s 行：服务器分节重复：'%s'" ;;
+            "line %s: unknown section '%s'") format="第 %s 行：未知分节：'%s'" ;;
+            'line %s: key/value appears before a section') format='第 %s 行：键值出现在分节之前' ;;
+            'line %s: expected key=value') format='第 %s 行：应使用 key=value 格式' ;;
+            "line %s: invalid key '%s'") format="第 %s 行：配置键无效：'%s'" ;;
+            "line %s: unknown key '%s' in [%s]") format="第 %s 行：未知配置键 '%s'，所在分节 [%s]" ;;
+            "line %s: duplicate key '%s'") format="第 %s 行：配置键重复：'%s'" ;;
+            "server '%s': source must not be empty") format="服务器 '%s'：source 不能为空" ;;
+            "server '%s': remote source must be absolute: '%s'") format="服务器 '%s'：远程 source 必须是绝对路径：'%s'" ;;
+            "server '%s': remote source must not be root") format="服务器 '%s'：远程 source 不能是根目录" ;;
+            "server '%s': remote source must not end with '/': '%s'") format="服务器 '%s'：远程 source 不能以 '/' 结尾：'%s'" ;;
+            "server '%s': remote source contains an unsafe path component: '%s'") format="服务器 '%s'：远程 source 包含不安全的路径组件：'%s'" ;;
+            "server '%s': remote source contains an unsupported character: '%s'") format="服务器 '%s'：远程 source 包含不支持的字符：'%s'" ;;
+            "server '%s': remote source derives invalid local name '%s'") format="服务器 '%s'：远程 source 生成的本地名称无效：'%s'" ;;
+            "missing required key '%s' in [global]") format="[global] 缺少必需配置键 '%s'" ;;
+            "missing required key '%s' in [defaults]") format="[defaults] 缺少必需配置键 '%s'" ;;
+            'no server sections configured') format='未配置任何服务器分节' ;;
+            "cannot canonicalize SyncWarden home '%s'") format="无法规范化 SyncWarden 控制目录 '%s'" ;;
+            'sync_hours is empty') format='sync_hours 不能为空' ;;
+            "invalid decimal sync hour '%s'") format="同步小时不是有效十进制小时：'%s'" ;;
+            "duplicate sync hour '%s'") format="同步小时重复：'%s'" ;;
+            "invalid positive decimal integer for 'log_retention_months': '%s'") format="log_retention_months 必须为正十进制整数：'%s'" ;;
+            "server '%s': missing required host") format="服务器 '%s'：缺少必需配置 host" ;;
+            "server '%s': invalid port '%s'") format="服务器 '%s'：端口无效：'%s'" ;;
+            "server '%s': 'scheduled_sync_enabled' must be yes or no") format="服务器 '%s'：scheduled_sync_enabled 必须为 yes 或 no" ;;
+            "server '%s': '%s' must be a positive decimal integer") format="服务器 '%s'：'%s' 必须为正十进制整数" ;;
+            "server '%s': retry_count must be a nonnegative decimal integer") format="服务器 '%s'：retry_count 必须为非负十进制整数" ;;
+            "server '%s': retry delays count is shorter than retry_count") format="服务器 '%s'：重试等待时间的数量少于 retry_count" ;;
+            "server '%s': retry delays must be nonnegative decimal integers") format="服务器 '%s'：重试等待时间必须为非负十进制整数" ;;
+            "server '%s': key_file must be absolute") format="服务器 '%s'：key_file 必须为绝对路径" ;;
+            "server '%s': owner must use USER:GROUP") format="服务器 '%s'：owner 必须使用 USER:GROUP 格式" ;;
+            "server '%s': missing required destination") format="服务器 '%s'：缺少必需配置 destination" ;;
+            "server '%s': invalid destination '%s'") format="服务器 '%s'：destination 无效：'%s'" ;;
+            "server '%s': destination contains a control character or index delimiter") format="服务器 '%s'：destination 包含控制字符或索引分隔符" ;;
+            "server '%s': cannot canonicalize destination '%s'") format="服务器 '%s'：无法规范化 destination：'%s'" ;;
+            "server '%s': canonical destination must not be root") format="服务器 '%s'：规范化后的 destination 不能是根目录" ;;
+            "server '%s': destination must not be directly below root: '%s'") format="服务器 '%s'：destination 不能直接位于根目录下：'%s'" ;;
+            "server '%s': destination parent must already exist as a real directory: '%s'") format="服务器 '%s'：destination 的父目录必须已存在且为真实目录：'%s'" ;;
+            "server '%s': unsafe managed path '%s'") format="服务器 '%s'：受管路径不安全：'%s'" ;;
+            "server '%s': destination contains a symbolic-link component: '%s'") format="服务器 '%s'：destination 包含符号链接组件：'%s'" ;;
+            "server '%s': destination exists but is not a directory: '%s'") format="服务器 '%s'：destination 已存在但不是目录：'%s'" ;;
+            "server '%s': missing required source") format="服务器 '%s'：缺少必需配置 source" ;;
+            "server '%s': duplicate local source name '%s'") format="服务器 '%s'：本地 source 名称重复：'%s'" ;;
+            "server '%s': cannot canonicalize target '%s'") format="服务器 '%s'：无法规范化目标：'%s'" ;;
+            "server '%s': target escapes canonical destination: '%s'") format="服务器 '%s'：目标超出规范化后的 destination：'%s'" ;;
+            "server '%s': target contains a symbolic-link component: '%s'") format="服务器 '%s'：目标包含符号链接组件：'%s'" ;;
+            "server '%s': target exists but is not a directory: '%s'") format="服务器 '%s'：目标已存在但不是目录：'%s'" ;;
+            "duplicate resolved target '%s' for servers '%s' and '%s'") format="解析后的目标 '%s' 重复，涉及服务器 '%s' 和 '%s'" ;;
+            "managed path overlap: server '%s' %s '%s' and server '%s' %s '%s'") format="受管路径重叠：服务器 '%s' 的 %s '%s' 与服务器 '%s' 的 %s '%s'" ;;
+            'log error: target is not a regular file: %s\n') format='日志错误：目标不是普通文件：%s\n' ;;
+            'configuration failure log error: cannot initialize SyncWarden control directories\n') format='配置失败日志错误：无法初始化 SyncWarden 控制目录\n' ;;
+            'configuration failure log error: cannot determine monthly failure log\n') format='配置失败日志错误：无法确定月度失败日志\n' ;;
+            'configuration failure log error: cannot append to %s\n') format='配置失败日志错误：无法追加写入 %s\n' ;;
+            'missing required commands: %s\n') format='缺少必需命令：%s\n' ;;
+            "private key error: server '%s' key must be a readable regular non-symlink file: %s\\n") format="私钥错误：服务器 '%s' 的私钥必须是可读的普通文件且不是符号链接：%s\\n" ;;
+            "private key error: cannot read permissions for server '%s': %s\\n") format="私钥错误：无法读取服务器 '%s' 的私钥权限：%s\\n" ;;
+            "private key permissions are unsafe for server '%s': %s is mode %s; group/other access must be 00\\n") format="服务器 '%s' 的私钥权限不安全：%s 的权限为 %s；组和其他用户的权限必须为 00\\n" ;;
+            'capacity error: no existing filesystem ancestor for %s\n') format='容量错误：%s 没有已存在的文件系统上级路径\n' ;;
+            'capacity error: free-space check timed out for %s\n') format='容量错误：%s 的可用空间检查超时\n' ;;
+            'capacity error: unable to read free space for %s\n') format='容量错误：无法读取 %s 的可用空间\n' ;;
+            'capacity error: unable to parse free space for %s\n') format='容量错误：无法解析 %s 的可用空间\n' ;;
+            'capacity error: inode check timed out for %s\n') format='容量错误：%s 的 inode 检查超时\n' ;;
+            'capacity error: unable to read free inodes for %s\n') format='容量错误：无法读取 %s 的可用 inode 数量\n' ;;
+            'capacity error: unable to parse free inodes for %s\n') format='容量错误：无法解析 %s 的可用 inode 数量\n' ;;
+            'capacity error: invalid df output for %s\n') format='容量错误：%s 的 df 输出无效\n' ;;
+            'capacity error: %s has %s MB free; server %s requires at least %s MB\n') format='容量错误：%s 可用空间为 %s MB；服务器 %s 至少需要 %s MB\n' ;;
+            'capacity error: %s has %s free inodes; server %s requires at least %s\n') format='容量错误：%s 有 %s 个可用 inode；服务器 %s 至少需要 %s 个\n' ;;
+            'archive error: unsafe destination path for %s/%s\n') format='归档错误：%s/%s 的目标路径不安全\n' ;;
+            'archive error: unable to find a unique timestamp name for %s\n') format='归档错误：无法为 %s 找到唯一时间戳名称\n' ;;
+            'internal error: retry loop exhausted for %s/%s\n') format='内部错误：%s/%s 的重试循环已耗尽\n' ;;
+            'global timeout log error: cannot initialize SyncWarden control directories\n') format='全局超时日志错误：无法初始化 SyncWarden 控制目录\n' ;;
+            'global timeout log error: cannot determine monthly failure log\n') format='全局超时日志错误：无法确定月度失败日志\n' ;;
+            'global timeout log error: cannot append to %s\n') format='全局超时日志错误：无法追加写入 %s\n' ;;
+            'warning: %s\n') format='警告：%s\n' ;;
+            'rotated log already exists; source preserved: %s') format='轮转日志已存在，保留原文件：%s' ;;
+            'cannot create gzip part file for: %s') format='无法创建 gzip 临时文件：%s' ;;
+            'failed to compress managed log; source preserved: %s') format='无法压缩受管日志，保留原文件：%s' ;;
+            'failed to set gzip mode; source preserved: %s') format='无法设置 gzip 文件权限，保留原文件：%s' ;;
+            'failed to promote compressed log; source preserved: %s') format='无法将压缩日志提升为正式文件，保留原文件：%s' ;;
+            'rotated log appeared during promotion; source preserved: %s') format='提升期间出现同名轮转日志，保留原文件：%s' ;;
+            'compressed log created but source removal failed: %s') format='已创建压缩日志，但无法删除原文件：%s' ;;
+            'log directories are missing or symbolic links; maintenance skipped') format='日志目录不存在或为符号链接，已跳过维护' ;;
+            'cannot determine log-maintenance reference time') format='无法确定日志维护的参考时间' ;;
+            'invalid log-maintenance reference epoch: %s') format='日志维护参考时间戳无效：%s' ;;
+            'cannot determine current month from epoch: %s') format='无法从时间戳确定当前月份：%s' ;;
+            'cannot determine oldest retained month from: %s') format='无法确定最早保留月份，参考月份：%s' ;;
+            'cannot create managed-log discovery manifest') format='无法创建受管日志扫描清单' ;;
+            'cannot create rotated-log discovery manifest') format='无法创建轮转日志扫描清单' ;;
+            'managed-log discovery failed; maintenance skipped') format='受管日志扫描失败，已跳过维护' ;;
+            'rotated-log discovery failed; maintenance skipped') format='轮转日志扫描失败，已跳过维护' ;;
+            'failed to remove expired managed log: %s') format='无法删除过期受管日志：%s' ;;
+            'failed to remove expired compressed log: %s') format='无法删除过期压缩日志：%s' ;;
+            'DRY RUN CHANGES - %s / %s\n') format='预演变化 - %s / %s\n' ;;
+            '  (no changes)\n') format='  （无变化）\n' ;;
+            'WARNING - %s') format='警告 - %s' ;;
+            'FAILURE - %s') format='失败 - %s' ;;
+            '  Time       : %s\n  Run ID     : %s\n  Mode       : %s\n  Server     : %s\n  ID         : %s') format='  时间       : %s\n  运行 ID    : %s\n  模式       : %s\n  服务器     : %s\n  ID         : %s' ;;
+            '\n  Source          : %s') format='\n  数据源          : %s' ;;
+            '\n  Stage      : %s\n  Reason     : %s\n  Exit Code  : %s\n  Stage Attempts  : %s') format='\n  阶段       : %s\n  原因       : %s\n  退出码     : %s\n  阶段尝试次数    : %s' ;;
+            '\n--------------------------------------------------------------------------------\nRAW OUTPUT\n%s') format='\n--------------------------------------------------------------------------------\n原始输出\n%s' ;;
+            '  Changes         : %s\n') format='  变化总数        : %s\n' ;;
+            '  Created         : %s\n') format='  新增            : %s\n' ;;
+            '  Updated         : %s\n') format='  更新            : %s\n' ;;
+            '  Deleted         : %s\n') format='  删除            : %s\n' ;;
+            '  Transferred     : %s\n') format='  传输量          : %s\n' ;;
+            '  Average Speed   : %s\n') format='  平均速度        : %s\n' ;;
+            '  Rsync Attempts  : %s\n') format='  rsync 尝试次数  : %s\n' ;;
+            '  Change Complete : %s\n') format='  变化统计完成    : %s\n' ;;
+            '[OK] %-20s archive=%-20s sync=%-8s duration=%s') format='[完成] %-20s 归档=%-20s 同步=%-8s 耗时=%s' ;;
+            '[OK] %-20s archive=%-20s sync=%-8s transferred=%s avg_speed=%s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s') format='[完成] %-20s 归档=%-20s 同步=%-8s 传输量=%s 平均速度=%s 变化=%s 新增=%s 更新=%s 删除=%s 尝试次数=%s 完成=%s 耗时=%s' ;;
+            '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable') format='[完成] %-20s 数据源=%-20s 归档=%s 变化=不适用 (not_applicable) 新增=不适用 (not_applicable) 更新=不适用 (not_applicable) 删除=不适用 (not_applicable) 尝试次数=0 完成=不适用 (not_applicable)' ;;
+            '  Time     : %s\n  Run ID   : %s\n  Mode     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Success  : %d\n  Warning  : %d\n  Failed   : %d\n  Duration : %s') format='  时间     : %s\n  运行 ID  : %s\n  模式     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\n汇总\n  成功     : %d\n  警告     : %d\n  失败     : %d\n  耗时     : %s' ;;
+            '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s') format='  时间     : %s\n  运行 ID  : %s\n  模式     : 仅归档 (ARCHIVE_ONLY)\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\n汇总\n  状态     : %s\n  耗时     : %s' ;;
+            '\n  Log Maintenance : WARNING') format='\n  日志维护        : 警告 (WARNING)' ;;
+            '\n  Final Status : FAILED\n  Reason       : LOG_WRITE_FAILED') format='\n  最终状态     : 失败 (FAILED)\n  原因         : 日志写入失败 (LOG_WRITE_FAILED)' ;;
+            '\n  Log Maintenance : WARNING\n  Final Status    : %s') format='\n  日志维护        : 警告 (WARNING)\n  最终状态        : %s' ;;
+            '\n  Final Status : %s\n  Reason       : %s') format='\n  最终状态     : %s\n  原因         : %s' ;;
+        esac
+    fi
+    printf -- "$format" "$@"
+}
+
+# Explain known machine codes only at display boundaries; preserve unknown data.
+ui_code() {
+    local code=$1 label=''
+    if use_chinese; then
+        case "$code" in
+            'SUCCESS') label='成功' ;;
+            'WARNING') label='警告' ;;
+            'FAILED') label='失败' ;;
+            'MANUAL') label='手动同步' ;;
+            'SCHEDULED') label='定时同步' ;;
+            'DRY_RUN') label='同步预演' ;;
+            'ARCHIVE_ONLY') label='仅归档' ;;
+            'PREFLIGHT') label='远程预检' ;;
+            'PRIVATE_KEY') label='私钥检查' ;;
+            'RSYNC') label='rsync 同步' ;;
+            'ARCHIVE') label='归档' ;;
+            'ARCHIVE_CLEANUP') label='归档清理' ;;
+            'STATE') label='状态写入' ;;
+            'AUTH_FAILED') label='SSH 身份验证失败' ;;
+            'HOST_KEY_CHANGED') label='SSH 主机密钥已变化' ;;
+            'REMOTE_SOURCE_MISSING') label='远程数据源不存在' ;;
+            'NETWORK_TRANSIENT') label='临时网络错误' ;;
+            'RSYNC_FAILED') label='rsync 失败' ;;
+            'RSYNC_IO_TIMEOUT') label='rsync 协议 I/O 超时' ;;
+            'TIMEOUT') label='命令超时' ;;
+            'GLOBAL_TIMEOUT') label='超过全局运行时限' ;;
+            'PRIVATE_KEY_FAILED') label='私钥检查失败' ;;
+            'PREFLIGHT_FAILED') label='远程预检失败' ;;
+            'INVALID_SOURCE') label='数据源无效' ;;
+            'UNSAFE_DESTINATION') label='目标路径不安全' ;;
+            'LOCAL_DESTINATION_FAILED') label='无法创建本地目标目录' ;;
+            'TEMP_OUTPUT_FAILED') label='无法创建临时输出文件' ;;
+            'RETRY_DELAY_FAILED') label='重试等待失败' ;;
+            'CAPACITY_CHECK_FAILED') label='容量检查失败' ;;
+            'CAPACITY_CHECK_TIMEOUT') label='容量检查超时' ;;
+            'LOW_FREE_SPACE') label='可用空间不足' ;;
+            'LOW_FREE_INODES') label='可用 inode 不足' ;;
+            'FAILED_ARCHIVE') label='归档失败' ;;
+            'FAILED_CREATE') label='归档创建失败' ;;
+            'FAILED_VERIFY') label='归档验证失败' ;;
+            'FAILED_CHECKSUM') label='归档校验和计算失败' ;;
+            'FAILED_OWNER') label='归档所有者设置失败' ;;
+            'FAILED_MODE') label='归档权限设置失败' ;;
+            'FAILED_PROMOTE') label='归档提升失败' ;;
+            'FAILED_INDEX') label='归档索引写入失败' ;;
+            'FAILED_TIMEOUT') label='归档操作超时' ;;
+            'FAILED_NAME_COLLISION') label='归档名称冲突' ;;
+            'FAILED_TEMP_OUTPUT') label='归档临时输出创建失败' ;;
+            'FAILED_UNSAFE_DESTINATION') label='归档目标路径不安全' ;;
+            'FAILED_CAPACITY_CHECK') label='归档容量检查失败' ;;
+            'FAILED_CAPACITY_CHECK_FAILED') label='归档容量检查失败' ;;
+            'FAILED_CAPACITY_CHECK_TIMEOUT') label='归档容量检查超时' ;;
+            'FAILED_LOW_FREE_SPACE') label='归档可用空间不足' ;;
+            'FAILED_LOW_FREE_INODES') label='归档可用 inode 不足' ;;
+            'FILES_VANISHED') label='源文件在传输前消失' ;;
+            'CHANGE_STATS_PARSE_FAILED') label='变化统计解析失败' ;;
+            'LOG_MAINTENANCE_WARNING') label='日志维护警告' ;;
+            'LOG_WRITE_FAILED') label='日志写入失败' ;;
+            'STATE_WRITE_FAILED') label='状态写入失败' ;;
+            'WARNING_CLEANUP') label='归档清理警告' ;;
+            'SKIPPED_NO_MIRROR') label='尚无镜像，跳过归档' ;;
+            'DRY_RUN_NO_ARCHIVE') label='预演不创建归档' ;;
+            'NOT_REQUESTED') label='未请求' ;;
+            'NOT_RUN') label='未运行' ;;
+            'yes') label='是' ;;
+            'no') label='否' ;;
+            'not_applicable') label='不适用' ;;
+            'unavailable') label='不可用' ;;
+            'unavailable (parse failed)') label='不可用，解析失败' ;;
+        esac
+    fi
+    if [[ -n "$label" ]]; then
+        printf '%s (%s)' "$label" "$code"
+    else
+        printf '%s' "$code"
+    fi
+}
+
+presentation_value() {
+    if [[ "$1" == ui_printf ]]; then
+        ui_code "$2"
+    else
+        printf '%s' "$2"
+    fi
+}
+
 if (( BASH_VERSINFO[0] < 5 )); then
-    printf 'SyncWarden requires Bash 5 or newer; found %s.\n' "$BASH_VERSION" >&2
+    ui_printf 'SyncWarden requires Bash 5 or newer; found %s.\n' "$BASH_VERSION" >&2
     return 69 2>/dev/null || exit 69
 fi
 
@@ -57,6 +308,8 @@ FIND_BIN=${SYNCWARDEN_FIND_BIN:-$(command -v find 2>/dev/null || printf 'find')}
 SORT_BIN=${SYNCWARDEN_SORT_BIN:-$(command -v sort 2>/dev/null || printf 'sort')}
 LOG_MAINTENANCE_MESSAGES=''
 FAILURE_BODY_RESULT=''
+FAILURE_DISPLAY_RESULT=''
+SERVER_FAILURE_DISPLAY_BODY=''
 
 # Fixed safety limits for individual external commands. Only rsync's
 # continuous no-I/O timeout belongs to the user configuration contract.
@@ -103,8 +356,10 @@ trim() {
 }
 
 config_error() {
-    [[ -n "$LAST_CONFIG_ERROR" ]] || LAST_CONFIG_ERROR=$1
-    printf 'configuration error: %s\n' "$1" >&2
+    local message
+    printf -v message -- "$@"
+    [[ -n "$LAST_CONFIG_ERROR" ]] || LAST_CONFIG_ERROR=$message
+    ui_printf 'configuration error: %s\n' "$(ui_printf "$@")" >&2
     return 1
 }
 
@@ -156,7 +411,7 @@ load_config() {
 
     reset_config
 
-    [[ -r "$file" ]] || config_error "config file is not readable: $file" || return 1
+    [[ -r "$file" ]] || config_error 'config file is not readable: %s' "$file" || return 1
 
     while IFS= read -r raw || [[ -n "$raw" ]]; do
         line_number=$((line_number + 1))
@@ -178,11 +433,11 @@ load_config() {
                 server:*)
                     server_id=${BASH_REMATCH[1]#server:}
                     [[ "$server_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
-                        config_error "line $line_number: invalid server ID '$server_id'"
+                        config_error "line %s: invalid server ID '%s'" "$line_number" "$server_id"
                         return 1
                     }
                     [[ -z "${SEEN_SERVER_SECTIONS[$server_id]+x}" ]] || {
-                        config_error "line $line_number: duplicate server section '$server_id'"
+                        config_error "line %s: duplicate server section '%s'" "$line_number" "$server_id"
                         return 1
                     }
                     SEEN_SERVER_SECTIONS[$server_id]=1
@@ -191,7 +446,7 @@ load_config() {
                     section='server'
                     ;;
                 *)
-                    config_error "line $line_number: unknown section '${BASH_REMATCH[1]}'"
+                    config_error "line %s: unknown section '%s'" "$line_number" "${BASH_REMATCH[1]}"
                     return 1
                     ;;
             esac
@@ -199,22 +454,22 @@ load_config() {
         fi
 
         [[ -n "$section" ]] || {
-            config_error "line $line_number: key/value appears before a section"
+            config_error 'line %s: key/value appears before a section' "$line_number"
             return 1
         }
         [[ "$line" == *=* ]] || {
-            config_error "line $line_number: expected key=value"
+            config_error 'line %s: expected key=value' "$line_number"
             return 1
         }
 
         key=$(trim "${line%%=*}")
         value=$(trim "${line#*=}")
         [[ "$key" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] || {
-            config_error "line $line_number: invalid key '$key'"
+            config_error "line %s: invalid key '%s'" "$line_number" "$key"
             return 1
         }
         is_allowed_key "$section" "$key" || {
-            config_error "line $line_number: unknown key '$key' in [$section]"
+            config_error "line %s: unknown key '%s' in [%s]" "$line_number" "$key" "$section"
             return 1
         }
 
@@ -225,7 +480,7 @@ load_config() {
         fi
 
         if [[ "$key" != 'source' && -n "${SEEN_KEYS[$seen_key]+x}" ]]; then
-            config_error "line $line_number: duplicate key '$key'"
+            config_error "line %s: duplicate key '%s'" "$line_number" "$key"
             return 1
         fi
         SEEN_KEYS[$seen_key]=1
@@ -328,39 +583,39 @@ validate_source_spec() {
     local -a components=()
 
     [[ -n "$remote" ]] || {
-        config_error "server '$server_id': source must not be empty"
+        config_error "server '%s': source must not be empty" "$server_id"
         return 1
     }
     [[ "$remote" == /* ]] || {
-        config_error "server '$server_id': remote source must be absolute: '$remote'"
+        config_error "server '%s': remote source must be absolute: '%s'" "$server_id" "$remote"
         return 1
     }
     [[ "$remote" != '/' ]] || {
-        config_error "server '$server_id': remote source must not be root"
+        config_error "server '%s': remote source must not be root" "$server_id"
         return 1
     }
     [[ "$remote" != */ ]] || {
-        config_error "server '$server_id': remote source must not end with '/': '$remote'"
+        config_error "server '%s': remote source must not end with '/': '%s'" "$server_id" "$remote"
         return 1
     }
     [[ "$remote" != *//* ]] || {
-        config_error "server '$server_id': remote source contains an unsafe path component: '$remote'"
+        config_error "server '%s': remote source contains an unsafe path component: '%s'" "$server_id" "$remote"
         return 1
     }
     [[ "$remote" =~ ^/[A-Za-z0-9._/-]+$ ]] || {
-        config_error "server '$server_id': remote source contains an unsupported character: '$remote'"
+        config_error "server '%s': remote source contains an unsupported character: '%s'" "$server_id" "$remote"
         return 1
     }
     IFS='/' read -r -a components <<<"${remote#/}"
     for component in "${components[@]}"; do
         [[ -n "$component" && "$component" != '.' && "$component" != '..' ]] || {
-            config_error "server '$server_id': remote source contains an unsafe path component: '$remote'"
+            config_error "server '%s': remote source contains an unsafe path component: '%s'" "$server_id" "$remote"
             return 1
         }
     done
     local_name=$(source_local_name "$remote") || return 1
     [[ "$local_name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && "$local_name" != '.' && "$local_name" != '..' ]] || {
-        config_error "server '$server_id': remote source derives invalid local name '$local_name'"
+        config_error "server '%s': remote source derives invalid local name '%s'" "$server_id" "$local_name"
         return 1
     }
 }
@@ -376,13 +631,13 @@ validate_required_config() {
 
     for key in "${global_keys[@]}"; do
         [[ -n "${GLOBAL[$key]+x}" && -n "${GLOBAL[$key]}" ]] || {
-            config_error "missing required key '$key' in [global]"
+            config_error "missing required key '%s' in [global]" "$key"
             return 1
         }
     done
     for key in "${default_keys[@]}"; do
         [[ -n "${DEFAULTS[$key]+x}" && -n "${DEFAULTS[$key]}" ]] || {
-            config_error "missing required key '$key' in [defaults]"
+            config_error "missing required key '%s' in [defaults]" "$key"
             return 1
         }
     done
@@ -402,7 +657,7 @@ validate_config() {
     }
 
     canonical_home=$(canonical_path "$SYNCWARDEN_HOME") || {
-        config_error "cannot canonicalize SyncWarden home '$SYNCWARDEN_HOME'"
+        config_error "cannot canonicalize SyncWarden home '%s'" "$SYNCWARDEN_HOME"
         return 1
     }
 
@@ -414,114 +669,114 @@ validate_config() {
     for hour in "${hours[@]}"; do
         hour=$(trim "$hour")
         is_nonnegative_integer "$hour" && (( 10#$hour <= 23 )) || {
-            config_error "invalid decimal sync hour '$hour'"
+            config_error "invalid decimal sync hour '%s'" "$hour"
             return 1
         }
         [[ -z "${seen_hours[$hour]+x}" ]] || {
-            config_error "duplicate sync hour '$hour'"
+            config_error "duplicate sync hour '%s'" "$hour"
             return 1
         }
         seen_hours[$hour]=1
     done
 
     is_positive_integer "${GLOBAL[log_retention_months]}" || {
-        config_error "invalid positive decimal integer for 'log_retention_months': '${GLOBAL[log_retention_months]}'"
+        config_error "invalid positive decimal integer for 'log_retention_months': '%s'" "${GLOBAL[log_retention_months]}"
         return 1
     }
 
     for id in "${SERVER_IDS[@]}"; do
         host=$(resolve_value "$id" host)
         [[ -n "$host" ]] || {
-            config_error "server '$id': missing required host"
+            config_error "server '%s': missing required host" "$id"
             return 1
         }
 
         port=$(resolve_value "$id" port)
         [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) || {
-            config_error "server '$id': invalid port '$port'"
+            config_error "server '%s': invalid port '%s'" "$id" "$port"
             return 1
         }
 
         value=$(resolve_value "$id" scheduled_sync_enabled)
         is_yes_no "$value" || {
-            config_error "server '$id': 'scheduled_sync_enabled' must be yes or no"
+            config_error "server '%s': 'scheduled_sync_enabled' must be yes or no" "$id"
             return 1
         }
 
         for key in rsync_timeout_seconds archive_recent_keep archive_monthly_keep min_free_space_mb min_free_inodes; do
             value=$(resolve_value "$id" "$key")
             is_positive_integer "$value" || {
-                config_error "server '$id': '$key' must be a positive decimal integer"
+                config_error "server '%s': '%s' must be a positive decimal integer" "$id" "$key"
                 return 1
             }
         done
         retry_count=$(resolve_value "$id" retry_count)
         is_nonnegative_integer "$retry_count" || {
-            config_error "server '$id': retry_count must be a nonnegative decimal integer"
+            config_error "server '%s': retry_count must be a nonnegative decimal integer" "$id"
             return 1
         }
         delay_string=$(resolve_value "$id" retry_delays_seconds)
         IFS=',' read -r -a delays <<<"$delay_string"
         if (( ${#delays[@]} < retry_count )); then
-            config_error "server '$id': retry delays count is shorter than retry_count"
+            config_error "server '%s': retry delays count is shorter than retry_count" "$id"
             return 1
         fi
         for value in "${delays[@]}"; do
             value=$(trim "$value")
             is_nonnegative_integer "$value" || {
-                config_error "server '$id': retry delays must be nonnegative decimal integers"
+                config_error "server '%s': retry delays must be nonnegative decimal integers" "$id"
                 return 1
             }
         done
 
         [[ "$(resolve_value "$id" key_file)" == /* ]] || {
-            config_error "server '$id': key_file must be absolute"
+            config_error "server '%s': key_file must be absolute" "$id"
             return 1
         }
         [[ "$(resolve_value "$id" owner)" == *:* ]] || {
-            config_error "server '$id': owner must use USER:GROUP"
+            config_error "server '%s': owner must use USER:GROUP" "$id"
             return 1
         }
 
         destination=$(resolved_destination "$id")
         [[ -n "$destination" ]] || {
-            config_error "server '$id': missing required destination"
+            config_error "server '%s': missing required destination" "$id"
             return 1
         }
         [[ "$destination" == /* && "$destination" != '/' ]] || {
-            config_error "server '$id': invalid destination '$destination'"
+            config_error "server '%s': invalid destination '%s'" "$id" "$destination"
             return 1
         }
         [[ "$destination" != *[[:cntrl:]\|]* ]] || {
-            config_error "server '$id': destination contains a control character or index delimiter"
+            config_error "server '%s': destination contains a control character or index delimiter" "$id"
             return 1
         }
         canonical_destination=$(canonical_path "$destination") || {
-            config_error "server '$id': cannot canonicalize destination '$destination'"
+            config_error "server '%s': cannot canonicalize destination '%s'" "$id" "$destination"
             return 1
         }
         [[ "$canonical_destination" != '/' ]] || {
-            config_error "server '$id': canonical destination must not be root"
+            config_error "server '%s': canonical destination must not be root" "$id"
             return 1
         }
         [[ "$(dirname -- "$canonical_destination")" != '/' ]] || {
-            config_error "server '$id': destination must not be directly below root: '$destination'"
+            config_error "server '%s': destination must not be directly below root: '%s'" "$id" "$destination"
             return 1
         }
         [[ -d "$(dirname -- "$canonical_destination")" && ! -L "$(dirname -- "$canonical_destination")" ]] || {
-            config_error "server '$id': destination parent must already exist as a real directory: '$(dirname -- "$canonical_destination")'"
+            config_error "server '%s': destination parent must already exist as a real directory: '%s'" "$id" "$(dirname -- "$canonical_destination")"
             return 1
         }
         if path_in_protected_tree "$canonical_destination" || paths_overlap "$canonical_destination" "$canonical_home"; then
-            config_error "server '$id': unsafe managed path '$canonical_destination'"
+            config_error "server '%s': unsafe managed path '%s'" "$id" "$canonical_destination"
             return 1
         fi
         if path_has_symlink_component "$destination"; then
-            config_error "server '$id': destination contains a symbolic-link component: '$destination'"
+            config_error "server '%s': destination contains a symbolic-link component: '%s'" "$id" "$destination"
             return 1
         fi
         if [[ -e "$destination" && ! -d "$destination" ]]; then
-            config_error "server '$id': destination exists but is not a directory: '$destination'"
+            config_error "server '%s': destination exists but is not a directory: '%s'" "$id" "$destination"
             return 1
         fi
         managed_paths+=("$canonical_destination")
@@ -531,7 +786,7 @@ validate_config() {
         sources=()
         get_server_sources "$id" sources
         (( ${#sources[@]} > 0 )) || {
-            config_error "server '$id': missing required source"
+            config_error "server '%s': missing required source" "$id"
             return 1
         }
         local_names=()
@@ -540,33 +795,33 @@ validate_config() {
             remote=$spec
             local_name=$(source_local_name "$remote") || return 1
             [[ -z "${local_names[$local_name]+x}" ]] || {
-                config_error "server '$id': duplicate local source name '$local_name'"
+                config_error "server '%s': duplicate local source name '%s'" "$id" "$local_name"
                 return 1
             }
             local_names[$local_name]=1
             target="${destination%/}/$local_name"
             canonical_target=$(canonical_path "$target") || {
-                config_error "server '$id': cannot canonicalize target '$target'"
+                config_error "server '%s': cannot canonicalize target '%s'" "$id" "$target"
                 return 1
             }
             [[ "$(dirname -- "$canonical_target")" == "$canonical_destination" ]] || {
-                config_error "server '$id': target escapes canonical destination: '$target'"
+                config_error "server '%s': target escapes canonical destination: '%s'" "$id" "$target"
                 return 1
             }
             if path_in_protected_tree "$canonical_target" || paths_overlap "$canonical_target" "$canonical_home"; then
-                config_error "server '$id': unsafe managed path '$canonical_target'"
+                config_error "server '%s': unsafe managed path '%s'" "$id" "$canonical_target"
                 return 1
             fi
             if path_has_symlink_component "$target"; then
-                config_error "server '$id': target contains a symbolic-link component: '$target'"
+                config_error "server '%s': target contains a symbolic-link component: '%s'" "$id" "$target"
                 return 1
             fi
             if [[ -e "$target" && ! -d "$target" ]]; then
-                config_error "server '$id': target exists but is not a directory: '$target'"
+                config_error "server '%s': target exists but is not a directory: '%s'" "$id" "$target"
                 return 1
             fi
             [[ -z "${resolved_targets[$canonical_target]+x}" ]] || {
-                config_error "duplicate resolved target '$canonical_target' for servers '${resolved_targets[$canonical_target]}' and '$id'"
+                config_error "duplicate resolved target '%s' for servers '%s' and '%s'" "$canonical_target" "${resolved_targets[$canonical_target]}" "$id"
                 return 1
             }
             resolved_targets[$canonical_target]=$id
@@ -580,7 +835,7 @@ validate_config() {
         for ((other_index = index + 1; other_index < ${#managed_paths[@]}; other_index++)); do
             [[ "${managed_ids[$index]}" != "${managed_ids[$other_index]}" ]] || continue
             if paths_overlap "${managed_paths[$index]}" "${managed_paths[$other_index]}"; then
-                config_error "managed path overlap: server '${managed_ids[$index]}' ${managed_kinds[$index]} '${managed_paths[$index]}' and server '${managed_ids[$other_index]}' ${managed_kinds[$other_index]} '${managed_paths[$other_index]}'"
+                config_error "managed path overlap: server '%s' %s '%s' and server '%s' %s '%s'" "${managed_ids[$index]}" "${managed_kinds[$index]}" "${managed_paths[$index]}" "${managed_ids[$other_index]}" "${managed_kinds[$other_index]}" "${managed_paths[$other_index]}"
                 return 1
             fi
         done
@@ -627,7 +882,7 @@ append_log_block() {
 
     mkdir -p -- "$(dirname -- "$file")" || return 1
     [[ ! -e "$file" || ( -f "$file" && ! -L "$file" ) ]] || {
-        printf 'log error: target is not a regular file: %s\n' "$file" >&2
+        ui_printf 'log error: target is not a regular file: %s\n' "$file" >&2
         return 1
     }
     render_log_block "$title" "$body" >>"$file" || return 1
@@ -640,17 +895,17 @@ persist_configuration_failure() {
     RUN_ID=${SYNCWARDEN_RUN_ID:-$(new_run_id)}
 
     if ! ensure_home_layout; then
-        printf 'configuration failure log error: cannot initialize SyncWarden control directories\n' >&2
+        ui_printf 'configuration failure log error: cannot initialize SyncWarden control directories\n' >&2
         return 1
     fi
     refresh_log_paths || {
-        printf 'configuration failure log error: cannot determine monthly failure log\n' >&2
+        ui_printf 'configuration failure log error: cannot determine monthly failure log\n' >&2
         return 1
     }
     body=$(printf '  Time        : %s\n  Run ID      : %s\n  Mode        : %s\n  Config File : %s\n  Stage       : CONFIGURATION\n  Reason      : %s' \
         "$(timestamp_now)" "$RUN_ID" "$mode" "$CONFIG_FILE" "$reason")
     append_log_block "$FAILURE_LOG" 'FAILURE - CONFIGURATION' "$body" || {
-        printf 'configuration failure log error: cannot append to %s\n' "$FAILURE_LOG" >&2
+        ui_printf 'configuration failure log error: cannot append to %s\n' "$FAILURE_LOG" >&2
         return 1
     }
 }
@@ -685,7 +940,7 @@ check_dependencies() {
         command -v "$command_name" >/dev/null 2>&1 || missing+=("$command_name")
     done
     if (( ${#missing[@]} > 0 )); then
-        printf 'missing required commands: %s\n' "${missing[*]}" >&2
+        ui_printf 'missing required commands: %s\n' "${missing[*]}" >&2
         return 1
     fi
 }
@@ -694,16 +949,16 @@ check_private_key() {
     local id=$1 key_file mode
     key_file=$(resolve_value "$id" key_file)
     [[ -f "$key_file" && ! -L "$key_file" && -r "$key_file" ]] || {
-        printf "private key error: server '%s' key must be a readable regular non-symlink file: %s\n" "$id" "$key_file" >&2
+        ui_printf "private key error: server '%s' key must be a readable regular non-symlink file: %s\n" "$id" "$key_file" >&2
         return 1
     }
     mode=$(stat -Lc '%a' -- "$key_file" 2>/dev/null) || {
-        printf "private key error: cannot read permissions for server '%s': %s\n" "$id" "$key_file" >&2
+        ui_printf "private key error: cannot read permissions for server '%s': %s\n" "$id" "$key_file" >&2
         return 1
     }
     mode=${mode: -3}
     [[ ${#mode} -eq 3 && "${mode:1:2}" == '00' ]] || {
-        printf "private key permissions are unsafe for server '%s': %s is mode %s; group/other access must be 00\n" \
+        ui_printf "private key permissions are unsafe for server '%s': %s is mode %s; group/other access must be 00\n" \
             "$id" "$key_file" "$mode" >&2
         return 1
     }
@@ -721,8 +976,8 @@ load_main_config() {
 }
 
 print_brief_usage() {
+    ui_printf 'Usage:\n'
     cat <<'USAGE'
-用法：
   syncwarden.sh SERVER_ID
   syncwarden.sh SERVER_ID --dry-run
   syncwarden.sh --help
@@ -730,34 +985,29 @@ USAGE
 }
 
 print_usage() {
-    cat <<USAGE
+    if use_chinese; then
+        cat <<USAGE
 SyncWarden - 带同步前 ZIP 归档保护的远程镜像备份工具
 
 配置文件：$CONFIG_FILE
+语言：SYNCWARDEN_LANG=en|zh（默认 en）
 
 用法：
   syncwarden.sh SERVER_ID
       同步指定服务器。
-
   syncwarden.sh SERVER_ID --dry-run
       预览同步变化，不修改镜像或创建 ZIP。
-
   syncwarden.sh --archive SERVER_ID
       只归档现有本地镜像，不执行同步。
-
   syncwarden.sh --scheduled
       执行到期的定时同步，供 cron 调用。
-
   syncwarden.sh --check
   syncwarden.sh --check --show-resolved
       检查配置；第二条命令同时显示最终解析结果。
-
   syncwarden.sh --list
       列出已配置的服务器。
-
   syncwarden.sh --status SERVER_ID
       查看服务器最近一次运行状态。
-
   syncwarden.sh --help
       显示帮助。
 
@@ -769,15 +1019,52 @@ SyncWarden - 带同步前 ZIP 归档保护的远程镜像备份工具
   syncwarden.sh --archive sample-server
   syncwarden.sh --check --show-resolved
 
-完整配置、安全说明和运行细节请查看项目 README.md。
+完整配置、安全说明和运行细节：README.zh.md（中文）、README.md（English）。
 USAGE
+    else
+        cat <<USAGE
+SyncWarden - Remote mirror backups with pre-sync ZIP protection
+
+Configuration file: $CONFIG_FILE
+Language: SYNCWARDEN_LANG=en|zh (default: en)
+
+Usage:
+  syncwarden.sh SERVER_ID
+      Synchronize the specified server.
+  syncwarden.sh SERVER_ID --dry-run
+      Preview changes without modifying mirrors or creating ZIPs.
+  syncwarden.sh --archive SERVER_ID
+      Archive existing local mirrors without synchronization.
+  syncwarden.sh --scheduled
+      Run due scheduled synchronizations, for use with cron.
+  syncwarden.sh --check
+  syncwarden.sh --check --show-resolved
+      Check configuration; the second command also shows effective values.
+  syncwarden.sh --list
+      List configured servers.
+  syncwarden.sh --status SERVER_ID
+      Show the server's latest recorded status.
+  syncwarden.sh --help
+      Show help.
+
+Short options: -n, -a, -s, -c, -r, -l, -t, -h
+
+Examples:
+  syncwarden.sh sample-server
+  syncwarden.sh sample-server --dry-run
+  syncwarden.sh --archive sample-server
+  syncwarden.sh --check --show-resolved
+
+Full configuration, safety, and operation details: README.md; 中文：README.zh.md.
+USAGE
+    fi
 }
 
 print_server_list() {
     local id
-    printf '%-20s %-18s %s\n' 'ID' 'SCHEDULED' 'NAME'
+    printf '%-20s %-18s %s\n' 'ID' "$(ui_printf 'SCHEDULED')" "$(ui_printf 'NAME')"
     for id in "${SERVER_IDS[@]}"; do
-        printf '%-20s %-18s %s\n' "$id" "$(resolve_value "$id" scheduled_sync_enabled)" "$(resolve_value "$id" name)"
+        printf '%-20s %-18s %s\n' "$id" "$(ui_code "$(resolve_value "$id" scheduled_sync_enabled)")" "$(resolve_value "$id" name)"
     done
 }
 
@@ -805,11 +1092,45 @@ print_status() {
     local id=$1
     local status_file="$LAST_STATUS_DIR/$id.status"
     if [[ ! -f "$status_file" ]]; then
-        printf '%s: no recorded status\n' "$id"
+        ui_printf '%s: no recorded status\n' "$id"
         return 0
     fi
-    printf 'Status for %s:\n' "$id"
-    sed 's/^/  /' "$status_file"
+    ui_printf 'Status for %s:\n' "$id"
+    if ! use_chinese; then
+        sed 's/^/  /' "$status_file"
+        return $?
+    fi
+    local line key value label
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        key=${line%%=*}
+        value=${line#*=}
+        label=''
+        case "$key" in
+            time) label='时间' ;;
+            status) label='状态' ;;
+            mode) label='模式' ;;
+            reason) label='原因' ;;
+            exit_code) label='退出码' ;;
+            duration_seconds) label='耗时秒数' ;;
+            changes) label='变化总数' ;;
+            created) label='新增' ;;
+            updated) label='更新' ;;
+            deleted) label='删除' ;;
+            transferred_bytes) label='传输字节数' ;;
+            sync_duration_microseconds) label='同步耗时微秒数' ;;
+            average_bytes_per_second) label='平均每秒字节数' ;;
+            attempts) label='尝试次数' ;;
+            change_complete) label='变化统计完成' ;;
+        esac
+        if [[ -n "$label" && "$line" == *=* ]]; then
+            # Time is user-visible data, not an enum; all other known fields are
+            # numeric or machine codes. Unknown values are displayed literally.
+            [[ "$key" == time ]] || value=$(ui_code "$value")
+            printf '  %s (%s): %s\n' "$label" "$key" "$value"
+        else
+            printf '  %s\n' "$line"
+        fi
+    done <"$status_file"
 }
 
 archive_basename() {
@@ -1072,6 +1393,8 @@ cleanup_archives() {
         if run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" "$RM_BIN" -f -- "$path"; then
             :
         else
+            # archive_source captures this diagnostic as persisted RAW OUTPUT.
+            # Keep it canonical; the terminal summary is localized separately.
             printf 'warning: failed to remove managed archive: %s\n' "$path" >&2
             delete_failed=1
             printf '%s|%s|%s|%s\n' "$epoch" "$month" "$sha" "$path" >>"$temp_file" || {
@@ -1189,7 +1512,7 @@ check_destination_capacity() {
     destination=$(resolved_destination "$id")
     probe=$(nearest_existing_path "$destination") || {
         LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-        printf 'capacity error: no existing filesystem ancestor for %s\n' "$destination" >&2
+        ui_printf 'capacity error: no existing filesystem ancestor for %s\n' "$destination" >&2
         return 1
     }
     output=$(run_with_timeout "$CAPACITY_CHECK_TIMEOUT_SECONDS" "$DF_BIN" -Pm -- "$probe" 2>/dev/null)
@@ -1197,16 +1520,16 @@ check_destination_capacity() {
     if (( rc != 0 )); then
         if (( rc == 124 || rc == 137 )); then
             LAST_CAPACITY_REASON='CAPACITY_CHECK_TIMEOUT'
-            printf 'capacity error: free-space check timed out for %s\n' "$probe" >&2
+            ui_printf 'capacity error: free-space check timed out for %s\n' "$probe" >&2
         else
             LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-            printf 'capacity error: unable to read free space for %s\n' "$probe" >&2
+            ui_printf 'capacity error: unable to read free space for %s\n' "$probe" >&2
         fi
         return 1
     fi
     available_mb=$(awk 'NR == 2 { print $4 }' <<<"$output") || {
         LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-        printf 'capacity error: unable to parse free space for %s\n' "$probe" >&2
+        ui_printf 'capacity error: unable to parse free space for %s\n' "$probe" >&2
         return 1
     }
     output=$(run_with_timeout "$CAPACITY_CHECK_TIMEOUT_SECONDS" "$DF_BIN" -Pi -- "$probe" 2>/dev/null)
@@ -1214,21 +1537,21 @@ check_destination_capacity() {
     if (( rc != 0 )); then
         if (( rc == 124 || rc == 137 )); then
             LAST_CAPACITY_REASON='CAPACITY_CHECK_TIMEOUT'
-            printf 'capacity error: inode check timed out for %s\n' "$probe" >&2
+            ui_printf 'capacity error: inode check timed out for %s\n' "$probe" >&2
         else
             LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-            printf 'capacity error: unable to read free inodes for %s\n' "$probe" >&2
+            ui_printf 'capacity error: unable to read free inodes for %s\n' "$probe" >&2
         fi
         return 1
     fi
     available_inodes=$(awk 'NR == 2 { print $4 }' <<<"$output") || {
         LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-        printf 'capacity error: unable to parse free inodes for %s\n' "$probe" >&2
+        ui_printf 'capacity error: unable to parse free inodes for %s\n' "$probe" >&2
         return 1
     }
     is_nonnegative_integer "$available_mb" && is_nonnegative_integer "$available_inodes" || {
         LAST_CAPACITY_REASON='CAPACITY_CHECK_FAILED'
-        printf 'capacity error: invalid df output for %s\n' "$probe" >&2
+        ui_printf 'capacity error: invalid df output for %s\n' "$probe" >&2
         return 1
     }
 
@@ -1236,13 +1559,13 @@ check_destination_capacity() {
     min_inodes=$(resolve_value "$id" min_free_inodes)
     if (( 10#$available_mb < 10#$min_mb )); then
         LAST_CAPACITY_REASON='LOW_FREE_SPACE'
-        printf 'capacity error: %s has %s MB free; server %s requires at least %s MB\n' \
+        ui_printf 'capacity error: %s has %s MB free; server %s requires at least %s MB\n' \
             "$probe" "$available_mb" "$id" "$min_mb" >&2
         return 1
     fi
     if (( 10#$available_inodes < 10#$min_inodes )); then
         LAST_CAPACITY_REASON='LOW_FREE_INODES'
-        printf 'capacity error: %s has %s free inodes; server %s requires at least %s\n' \
+        ui_printf 'capacity error: %s has %s free inodes; server %s requires at least %s\n' \
             "$probe" "$available_inodes" "$id" "$min_inodes" >&2
         return 1
     fi
@@ -1266,7 +1589,7 @@ archive_source() {
     local_path="${destination%/}/$local_name"
 
     if ! ensure_safe_target_path "$id" "$local_name"; then
-        printf 'archive error: unsafe destination path for %s/%s\n' "$id" "$local_name" >&2
+        ui_printf 'archive error: unsafe destination path for %s/%s\n' "$id" "$local_name" >&2
         LAST_ARCHIVE_STATUS='FAILED_UNSAFE_DESTINATION'
         return 1
     fi
@@ -1289,7 +1612,7 @@ archive_source() {
         epoch=$((epoch + 1))
         collision_count=$((collision_count + 1))
         if (( collision_count > 3600 )); then
-            printf 'archive error: unable to find a unique timestamp name for %s\n' "$local_name" >&2
+            ui_printf 'archive error: unable to find a unique timestamp name for %s\n' "$local_name" >&2
             LAST_ARCHIVE_STATUS='FAILED_NAME_COLLISION'
             return 1
         fi
@@ -1580,7 +1903,7 @@ run_command_with_retry() {
         attempt=$((attempt + 1))
     done
 
-    printf 'internal error: retry loop exhausted for %s/%s\n' "$id" "$stage" >&2
+    ui_printf 'internal error: retry loop exhausted for %s/%s\n' "$id" "$stage" >&2
     return 1
 }
 
@@ -1766,11 +2089,11 @@ sync_source() {
             (( dry_run == 1 )) || LAST_CHANGE_COMPLETE='yes'
             if (( dry_run == 1 )); then
                 printf '%s\n' '--------------------------------------------------------------------------------'
-                printf 'DRY RUN CHANGES - %s / %s\n' "$(resolve_value "$id" name)" "$local_name"
+                ui_printf 'DRY RUN CHANGES - %s / %s\n' "$(resolve_value "$id" name)" "$local_name"
                 if [[ -s "$output_file" ]]; then
                     sed 's/^/  /' "$output_file"
                 else
-                    printf '%s\n' '  (no changes)'
+                    ui_printf '  (no changes)\n'
                 fi
                 printf '%s\n' '--------------------------------------------------------------------------------'
             fi
@@ -1933,25 +2256,27 @@ server_average_speed_display() {
 }
 
 render_server_change_summary() {
+    local printer=${1:-printf}
     local changes created updated deleted
     changes=$(server_change_value "$SERVER_CHANGE_COUNT")
     created=$(server_change_value "$SERVER_CHANGE_CREATED")
     updated=$(server_change_value "$SERVER_CHANGE_UPDATED")
     deleted=$(server_change_value "$SERVER_CHANGE_DELETED")
     [[ "$SERVER_CHANGE_STATE" == 'parse_failed' ]] && changes='unavailable (parse failed)'
-    printf '  Changes         : %s\n' "$changes"
-    printf '  Created         : %s\n' "$created"
-    printf '  Updated         : %s\n' "$updated"
-    printf '  Deleted         : %s\n' "$deleted"
-    printf '  Transferred     : %s\n' "$(server_transfer_size_display)"
-    printf '  Average Speed   : %s\n' "$(server_average_speed_display)"
-    printf '  Rsync Attempts  : %s\n' "$SERVER_CHANGE_ATTEMPTS"
-    printf '  Change Complete : %s\n' "$SERVER_CHANGE_COMPLETE"
+    "$printer" '  Changes         : %s\n' "$(presentation_value "$printer" "$changes")"
+    "$printer" '  Created         : %s\n' "$(presentation_value "$printer" "$created")"
+    "$printer" '  Updated         : %s\n' "$(presentation_value "$printer" "$updated")"
+    "$printer" '  Deleted         : %s\n' "$(presentation_value "$printer" "$deleted")"
+    "$printer" '  Transferred     : %s\n' "$(presentation_value "$printer" "$(server_transfer_size_display)")"
+    "$printer" '  Average Speed   : %s\n' "$(presentation_value "$printer" "$(server_average_speed_display)")"
+    "$printer" '  Rsync Attempts  : %s\n' "$SERVER_CHANGE_ATTEMPTS"
+    "$printer" '  Change Complete : %s\n' "$(presentation_value "$printer" "$SERVER_CHANGE_COMPLETE")"
 }
 
 attach_server_change_summary() {
     (( SERVER_CHANGE_SUMMARY_ATTACHED == 0 )) || return 0
     SERVER_FAILURE_BODY+="${SERVER_FAILURE_BODY:+$'\n'}$(render_server_change_summary)"
+    SERVER_FAILURE_DISPLAY_BODY+="${SERVER_FAILURE_DISPLAY_BODY:+$'\n'}$(render_server_change_summary ui_printf)"
     SERVER_CHANGE_SUMMARY_ATTACHED=1
 }
 
@@ -2031,6 +2356,7 @@ persist_server_status() {
     build_failure_body "$id" "$mode" 'STATE' 'STATE_WRITE_FAILED' 1 1 ''
     body=$FAILURE_BODY_RESULT
     SERVER_FAILURE_BODY+="${SERVER_FAILURE_BODY:+$'\n'}$body"
+    SERVER_FAILURE_DISPLAY_BODY+="${SERVER_FAILURE_DISPLAY_BODY:+$'\n'}$FAILURE_DISPLAY_RESULT"
     attach_server_change_summary
     SERVER_STATUS='FAILED'
     SERVER_REASON='STATE_WRITE_FAILED'
@@ -2046,23 +2372,30 @@ build_failure_body() {
     local attempts=$6
     local output_path=${7-}
     local source_name=${8-}
-    local name raw='' body
+    local name raw='' time
     name=$(resolve_value "$id" name)
     if [[ -n "$output_path" && -f "$output_path" ]]; then
         raw=$(sed 's/^/  /' "$output_path")
         discard_temp_file "$output_path"
     fi
-    printf -v body '  Time       : %s\n  Run ID     : %s\n  Mode       : %s\n  Server     : %s\n  ID         : %s' \
-        "$(timestamp_now)" "${RUN_ID:-none}" "$mode" "$name" "$id"
+    time=$(timestamp_now)
+    FAILURE_BODY_RESULT=$(render_failure_body printf "$time" "${RUN_ID:-none}" "$mode" "$name" "$id" "$source_name" "$stage" "$reason" "$exit_code" "$attempts" "$raw")
+    FAILURE_DISPLAY_RESULT=$(render_failure_body ui_printf "$time" "${RUN_ID:-none}" "$mode" "$name" "$id" "$source_name" "$stage" "$reason" "$exit_code" "$attempts" "$raw")
+}
+
+render_failure_body() {
+    local printer=$1 time=$2 run_id=$3 mode=$4 name=$5 id=$6 source_name=$7
+    local stage=$8 reason=$9 exit_code=${10} attempts=${11} raw=${12}
+    "$printer" '  Time       : %s\n  Run ID     : %s\n  Mode       : %s\n  Server     : %s\n  ID         : %s' \
+        "$time" "$run_id" "$(presentation_value "$printer" "$mode")" "$name" "$id"
     if [[ -n "$source_name" ]]; then
-        printf -v body '%s\n  Source          : %s' "$body" "$source_name"
+        "$printer" '\n  Source          : %s' "$source_name"
     fi
-    printf -v body '%s\n  Stage      : %s\n  Reason     : %s\n  Exit Code  : %s\n  Stage Attempts  : %s' \
-        "$body" "$stage" "$reason" "$exit_code" "$attempts"
+    "$printer" '\n  Stage      : %s\n  Reason     : %s\n  Exit Code  : %s\n  Stage Attempts  : %s' \
+        "$(presentation_value "$printer" "$stage")" "$(presentation_value "$printer" "$reason")" "$exit_code" "$attempts"
     if [[ -n "$raw" ]]; then
-        printf -v body '%s\n--------------------------------------------------------------------------------\nRAW OUTPUT\n%s' "$body" "$raw"
+        "$printer" '\n--------------------------------------------------------------------------------\nRAW OUTPUT\n%s' "$raw"
     fi
-    FAILURE_BODY_RESULT=$body
 }
 
 managed_plain_log_name() {
@@ -2079,9 +2412,10 @@ log_month_key() {
 }
 
 log_maintenance_warn() {
-    local message=$1
+    local message
+    printf -v message -- "$@"
     LOG_MAINTENANCE_MESSAGES+="${LOG_MAINTENANCE_MESSAGES:+$'\n'}$message"
-    printf 'warning: %s\n' "$message" >&2
+    ui_printf 'warning: %s\n' "$(ui_printf "$@")" >&2
 }
 
 compress_managed_log() {
@@ -2090,36 +2424,36 @@ compress_managed_log() {
     local part
 
     if [[ -e "$destination" || -L "$destination" ]]; then
-        log_maintenance_warn "rotated log already exists; source preserved: $destination"
+        log_maintenance_warn 'rotated log already exists; source preserved: %s' "$destination"
         return 2
     fi
     make_temp_file part "$ROTATED_LOG_DIR/.$kind-$month.log.XXXXXX.part.gz" || {
-        log_maintenance_warn "cannot create gzip part file for: $source"
+        log_maintenance_warn 'cannot create gzip part file for: %s' "$source"
         return 2
     }
     if ! run_with_timeout "$LOG_COMMAND_TIMEOUT_SECONDS" "$GZIP_BIN" -c -- "$source" >"$part"; then
         discard_temp_file "$part"
-        log_maintenance_warn "failed to compress managed log; source preserved: $source"
+        log_maintenance_warn 'failed to compress managed log; source preserved: %s' "$source"
         return 2
     fi
     run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" chmod 0600 -- "$part" || {
         discard_temp_file "$part"
-        log_maintenance_warn "failed to set gzip mode; source preserved: $source"
+        log_maintenance_warn 'failed to set gzip mode; source preserved: %s' "$source"
         return 2
     }
     if ! run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" mv -T -n -- "$part" "$destination"; then
         discard_temp_file "$part"
-        log_maintenance_warn "failed to promote compressed log; source preserved: $source"
+        log_maintenance_warn 'failed to promote compressed log; source preserved: %s' "$source"
         return 2
     fi
     if [[ -e "$part" || -L "$part" ]]; then
         discard_temp_file "$part"
-        log_maintenance_warn "rotated log appeared during promotion; source preserved: $destination"
+        log_maintenance_warn 'rotated log appeared during promotion; source preserved: %s' "$destination"
         return 2
     fi
     unregister_temp_file "$part"
     if ! run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" "$RM_BIN" -f -- "$source"; then
-        log_maintenance_warn "compressed log created but source removal failed: $source"
+        log_maintenance_warn 'compressed log created but source removal failed: %s' "$source"
         return 2
     fi
     return 0
@@ -2141,16 +2475,16 @@ maintain_monthly_logs() {
         return 2
     }
     current_month=$(date -d "@$reference" +%Y-%m) || {
-        log_maintenance_warn "invalid log-maintenance reference epoch: $reference"
+        log_maintenance_warn 'invalid log-maintenance reference epoch: %s' "$reference"
         return 2
     }
     month_start=$(date -d "@$reference" +%Y-%m-01) || {
-        log_maintenance_warn "cannot determine current month from epoch: $reference"
+        log_maintenance_warn 'cannot determine current month from epoch: %s' "$reference"
         return 2
     }
     retention=${GLOBAL[log_retention_months]}
     oldest_month=$(date -d "$month_start -$((retention - 1)) months" +%Y-%m) || {
-        log_maintenance_warn "cannot determine oldest retained month from: $month_start"
+        log_maintenance_warn 'cannot determine oldest retained month from: %s' "$month_start"
         return 2
     }
     current_key=$(log_month_key "$current_month")
@@ -2189,7 +2523,7 @@ maintain_monthly_logs() {
         key=$(log_month_key "$month")
         if (( key < oldest_key )); then
             run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" "$RM_BIN" -f -- "$path" || {
-                log_maintenance_warn "failed to remove expired managed log: $path"
+                log_maintenance_warn 'failed to remove expired managed log: %s' "$path"
                 warning=1
             }
         elif (( key < current_key )); then
@@ -2207,7 +2541,7 @@ maintain_monthly_logs() {
         key=$(log_month_key "$month")
         if (( key < oldest_key )); then
             run_with_timeout "$LOCAL_COMMAND_TIMEOUT_SECONDS" "$RM_BIN" -f -- "$path" || {
-                log_maintenance_warn "failed to remove expired compressed log: $path"
+                log_maintenance_warn 'failed to remove expired compressed log: %s' "$path"
                 warning=1
             }
         fi
@@ -2220,17 +2554,37 @@ maintain_monthly_logs() {
     return 0
 }
 
+render_server_result() {
+    local printer=$1 dry_run=$2 name=$3 archive_summary=$4 sync_summary=$5 duration=$6
+    if (( dry_run == 1 )); then
+        "$printer" '[OK] %-20s archive=%-20s sync=%-8s duration=%s' \
+            "$name" "$(presentation_value "$printer" "$archive_summary")" "$(presentation_value "$printer" "$sync_summary")" "$(format_duration "$duration")"
+    else
+        "$printer" '[OK] %-20s archive=%-20s sync=%-8s transferred=%s avg_speed=%s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s' \
+            "$name" "$(presentation_value "$printer" "$archive_summary")" "$(presentation_value "$printer" "$sync_summary")" \
+            "$(presentation_value "$printer" "$(server_transfer_size_display)")" \
+            "$(presentation_value "$printer" "$(server_average_speed_display)")" \
+            "$(presentation_value "$printer" "$(server_change_value "$SERVER_CHANGE_COUNT")")" \
+            "$(presentation_value "$printer" "$(server_change_value "$SERVER_CHANGE_CREATED")")" \
+            "$(presentation_value "$printer" "$(server_change_value "$SERVER_CHANGE_UPDATED")")" \
+            "$(presentation_value "$printer" "$(server_change_value "$SERVER_CHANGE_DELETED")")" \
+            "$SERVER_CHANGE_ATTEMPTS" "$(presentation_value "$printer" "$SERVER_CHANGE_COMPLETE")" "$(format_duration "$duration")"
+    fi
+}
+
 run_server() {
     local id=$1
     local mode=$2
     local dry_run=${3:-0}
     local started duration name spec rc server_rc=0 reason='SUCCESS'
-    local archive_summary='NOT_REQUESTED' sync_summary='NOT_RUN' failure_parts=''
+    local archive_summary='NOT_REQUESTED' sync_summary='NOT_RUN' failure_parts='' failure_display_parts=''
     local -a sources=()
 
     SERVER_STATUS=''
     SERVER_RESULT_LINE=''
+    SERVER_RESULT_DISPLAY_LINE=''
     SERVER_FAILURE_BODY=''
+    SERVER_FAILURE_DISPLAY_BODY=''
     SERVER_ARCHIVE_SUMMARY=''
     SERVER_REASON=''
     reset_server_change_stats
@@ -2249,6 +2603,7 @@ run_server() {
         finalize_server_change_stats
         build_failure_body "$id" "$mode" 'PRIVATE_KEY' "$reason" 1 0 ''
         SERVER_FAILURE_BODY=$FAILURE_BODY_RESULT
+        SERVER_FAILURE_DISPLAY_BODY=$FAILURE_DISPLAY_RESULT
         attach_server_change_summary
         SERVER_STATUS='FAILED'
         SERVER_ARCHIVE_SUMMARY='NOT_REQUESTED'
@@ -2267,6 +2622,7 @@ run_server() {
         finalize_server_change_stats
         build_failure_body "$id" "$mode" 'PREFLIGHT' "$reason" "${LAST_EXIT_CODE:-1}" "${LAST_ATTEMPT_COUNT:-1}" "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
         SERVER_FAILURE_BODY=$FAILURE_BODY_RESULT
+        SERVER_FAILURE_DISPLAY_BODY=$FAILURE_DISPLAY_RESULT
         attach_server_change_summary
         SERVER_STATUS='FAILED'
         SERVER_REASON=$reason
@@ -2296,14 +2652,17 @@ run_server() {
                     reason=$LAST_ARCHIVE_STATUS
                     build_failure_body "$id" "$mode" 'ARCHIVE_CLEANUP' "$reason" 2 1 "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
                     failure_parts+="$FAILURE_BODY_RESULT"$'\n'
+                    failure_display_parts+="$FAILURE_DISPLAY_RESULT"$'\n'
                     ;;
                 *)
                     archive_summary=${LAST_ARCHIVE_STATUS:-FAILED_ARCHIVE}
                     reason=$archive_summary
                     build_failure_body "$id" "$mode" 'ARCHIVE' "$reason" 1 1 "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
                     failure_parts+="$FAILURE_BODY_RESULT"$'\n'
+                    failure_display_parts+="$FAILURE_DISPLAY_RESULT"$'\n'
                     SERVER_ARCHIVE_SUMMARY=$archive_summary
                     SERVER_FAILURE_BODY=${failure_parts%$'\n'}
+                    SERVER_FAILURE_DISPLAY_BODY=${failure_display_parts%$'\n'}
                     finalize_server_change_stats
                     attach_server_change_summary
                     SERVER_STATUS='FAILED'
@@ -2333,6 +2692,7 @@ run_server() {
                 fi
                 build_failure_body "$id" "$mode" 'RSYNC' "${LAST_FAILURE_REASON:-FILES_VANISHED}" "${LAST_EXIT_CODE:-24}" "${LAST_ATTEMPT_COUNT:-1}" "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
                 failure_parts+="$FAILURE_BODY_RESULT"$'\n'
+                failure_display_parts+="$FAILURE_DISPLAY_RESULT"$'\n'
                 ;;
             *)
                 server_rc=1
@@ -2340,27 +2700,17 @@ run_server() {
                 reason=${LAST_FAILURE_REASON:-RSYNC_FAILED}
                 build_failure_body "$id" "$mode" 'RSYNC' "$reason" "${LAST_EXIT_CODE:-1}" "${LAST_ATTEMPT_COUNT:-1}" "${LAST_COMMAND_OUTPUT:-}" "$LAST_SOURCE_NAME"
                 failure_parts+="$FAILURE_BODY_RESULT"$'\n'
+                failure_display_parts+="$FAILURE_DISPLAY_RESULT"$'\n'
                 ;;
         esac
     done
 
     finalize_server_change_stats
     duration=$(( $(wall_now_epoch) - started ))
-    if (( dry_run == 1 )); then
-        SERVER_RESULT_LINE=$(printf '[OK] %-20s archive=%-20s sync=%-8s duration=%s' \
-            "$name" "$archive_summary" "$sync_summary" "$(format_duration "$duration")")
-    else
-        SERVER_RESULT_LINE=$(printf '[OK] %-20s archive=%-20s sync=%-8s transferred=%s avg_speed=%s changes=%s created=%s updated=%s deleted=%s attempts=%s complete=%s duration=%s' \
-            "$name" "$archive_summary" "$sync_summary" \
-            "$(server_transfer_size_display)" \
-            "$(server_average_speed_display)" \
-            "$(server_change_value "$SERVER_CHANGE_COUNT")" \
-            "$(server_change_value "$SERVER_CHANGE_CREATED")" \
-            "$(server_change_value "$SERVER_CHANGE_UPDATED")" \
-            "$(server_change_value "$SERVER_CHANGE_DELETED")" \
-            "$SERVER_CHANGE_ATTEMPTS" "$SERVER_CHANGE_COMPLETE" "$(format_duration "$duration")")
-    fi
+    SERVER_RESULT_LINE=$(render_server_result printf "$dry_run" "$name" "$archive_summary" "$sync_summary" "$duration")
+    SERVER_RESULT_DISPLAY_LINE=$(render_server_result ui_printf "$dry_run" "$name" "$archive_summary" "$sync_summary" "$duration")
     SERVER_FAILURE_BODY=${failure_parts%$'\n'}
+    SERVER_FAILURE_DISPLAY_BODY=${failure_display_parts%$'\n'}
     [[ -z "$SERVER_FAILURE_BODY" ]] || attach_server_change_summary
 
     case "$server_rc" in
@@ -2396,7 +2746,7 @@ run_batch() {
     local dry_run=$2
     shift 2
     local started duration id rc success_count=0 warning_count=0 failed_count=0 overall=0
-    local success_lines='' summary_body failure_title persistence_failed=0
+    local success_lines='' success_display_lines='' summary_body summary_display_body summary_time failure_title failure_display_title persistence_failed=0
     local run_log_epoch='' maintenance_rc maintenance_body
     local -a persisted_ids=()
 
@@ -2418,33 +2768,39 @@ run_batch() {
             0)
                 success_count=$((success_count + 1))
                 success_lines+="$SERVER_RESULT_LINE"$'\n'
+                success_display_lines+="$SERVER_RESULT_DISPLAY_LINE"$'\n'
                 ;;
             2)
                 warning_count=$((warning_count + 1))
                 (( overall == 0 )) && overall=2
                 failure_title="WARNING - $(resolve_value "$id" name)"
+                failure_display_title=$(ui_printf 'WARNING - %s' "$(resolve_value "$id" name)")
                 if (( dry_run == 0 )); then
                     append_log_block "$FAILURE_LOG" "$failure_title" "$SERVER_FAILURE_BODY" || persistence_failed=1
                 else
-                    render_log_block "$failure_title" "$SERVER_FAILURE_BODY"
+                    render_log_block "$failure_display_title" "$SERVER_FAILURE_DISPLAY_BODY"
                 fi
                 ;;
             *)
                 failed_count=$((failed_count + 1))
                 overall=1
                 failure_title="FAILURE - $(resolve_value "$id" name)"
+                failure_display_title=$(ui_printf 'FAILURE - %s' "$(resolve_value "$id" name)")
                 if (( dry_run == 0 )); then
                     append_log_block "$FAILURE_LOG" "$failure_title" "$SERVER_FAILURE_BODY" || persistence_failed=1
                 else
-                    render_log_block "$failure_title" "$SERVER_FAILURE_BODY"
+                    render_log_block "$failure_display_title" "$SERVER_FAILURE_DISPLAY_BODY"
                 fi
                 ;;
         esac
     done
 
     duration=$(( $(wall_now_epoch) - started ))
+    summary_time=$(timestamp_now)
     summary_body=$(printf '  Time     : %s\n  Run ID   : %s\n  Mode     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Success  : %d\n  Warning  : %d\n  Failed   : %d\n  Duration : %s' \
-        "$(timestamp_now)" "$RUN_ID" "$mode" "$success_lines" "$success_count" "$warning_count" "$failed_count" "$(format_duration "$duration")")
+        "$summary_time" "$RUN_ID" "$mode" "$success_lines" "$success_count" "$warning_count" "$failed_count" "$(format_duration "$duration")")
+    summary_display_body=$(ui_printf '  Time     : %s\n  Run ID   : %s\n  Mode     : %s\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Success  : %d\n  Warning  : %d\n  Failed   : %d\n  Duration : %s' \
+        "$summary_time" "$RUN_ID" "$(ui_code "$mode")" "$success_display_lines" "$success_count" "$warning_count" "$failed_count" "$(format_duration "$duration")")
 
     if (( dry_run == 0 )); then
         append_log_block "$SUCCESS_LOG" 'RUN START' "$summary_body" || persistence_failed=1
@@ -2456,6 +2812,7 @@ run_batch() {
             append_log_block "$FAILURE_LOG" 'WARNING - LOG MAINTENANCE' "$maintenance_body" || persistence_failed=1
             (( overall == 0 )) && overall=2
             summary_body+=$'\n  Log Maintenance : WARNING'
+            summary_display_body+=$(ui_printf '\n  Log Maintenance : WARNING')
         fi
     fi
     if (( persistence_failed != 0 )); then
@@ -2466,9 +2823,10 @@ run_batch() {
             done
         fi
         summary_body+=$'\n  Final Status : FAILED\n  Reason       : LOG_WRITE_FAILED'
+        summary_display_body+=$(ui_printf '\n  Final Status : FAILED\n  Reason       : LOG_WRITE_FAILED')
     fi
 
-    printf '%s\n' "$summary_body"
+    printf '%s\n' "$summary_display_body"
 
     return "$overall"
 }
@@ -2535,7 +2893,7 @@ write_schedule_state() {
 acquire_lock() {
     exec {SYNCWARDEN_LOCK_FD}>"$LOCK_FILE" || return 1
     if ! flock -n "$SYNCWARDEN_LOCK_FD"; then
-        printf 'SyncWarden is already running (lock: %s)\n' "$LOCK_FILE" >&2
+        ui_printf 'SyncWarden is already running (lock: %s)\n' "$LOCK_FILE" >&2
         return 75
     fi
 }
@@ -2553,7 +2911,7 @@ scheduled_server_ids() {
 run_archive_only() {
     local id=$1
     local started spec local_name rc overall=0 duration name status='SUCCESS' reason='SUCCESS'
-    local success_lines='' failure_body='' title summary_body persistence_failed=0
+    local success_lines='' success_display_lines='' failure_body='' title summary_body summary_display_body summary_time persistence_failed=0
     local maintenance_rc maintenance_body run_log_epoch
     local -a sources=()
     RUN_ID=${SYNCWARDEN_RUN_ID:-$(new_run_id)}
@@ -2572,6 +2930,7 @@ run_archive_only() {
         case "$rc" in
             0)
                 success_lines+="$(printf '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable' "$name" "$local_name" "$LAST_ARCHIVE_STATUS")"$'\n'
+                success_display_lines+="$(ui_printf '[OK] %-20s source=%-20s archive=%s changes=not_applicable created=not_applicable updated=not_applicable deleted=not_applicable attempts=0 complete=not_applicable' "$name" "$local_name" "$(ui_code "$LAST_ARCHIVE_STATUS")")"$'\n'
                 ;;
             2)
                 if (( overall == 0 )); then
@@ -2593,8 +2952,11 @@ run_archive_only() {
     done
 
     duration=$(( $(wall_now_epoch) - started ))
+    summary_time=$(timestamp_now)
     summary_body=$(printf '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s' \
-        "$(timestamp_now)" "$RUN_ID" "$success_lines" "$status" "$(format_duration "$duration")")
+        "$summary_time" "$RUN_ID" "$success_lines" "$status" "$(format_duration "$duration")")
+    summary_display_body=$(ui_printf '  Time     : %s\n  Run ID   : %s\n  Mode     : ARCHIVE_ONLY\n--------------------------------------------------------------------------------\n%s--------------------------------------------------------------------------------\nSUMMARY\n  Status   : %s\n  Duration : %s' \
+        "$summary_time" "$RUN_ID" "$success_display_lines" "$(ui_code "$status")" "$(format_duration "$duration")")
     append_log_block "$SUCCESS_LOG" 'ARCHIVE ONLY' "$summary_body" || persistence_failed=1
     if [[ -n "$failure_body" ]]; then
         failure_body=${failure_body%$'\n'}
@@ -2614,6 +2976,7 @@ run_archive_only() {
             reason='LOG_MAINTENANCE_WARNING'
         fi
         summary_body+=$(printf '\n  Log Maintenance : WARNING\n  Final Status    : %s' "$status")
+        summary_display_body+=$(ui_printf '\n  Log Maintenance : WARNING\n  Final Status    : %s' "$(ui_code "$status")")
     fi
     if (( persistence_failed != 0 )); then
         overall=1
@@ -2628,8 +2991,9 @@ run_archive_only() {
     fi
     if (( persistence_failed != 0 )); then
         summary_body+=$(printf '\n  Final Status : %s\n  Reason       : %s' "$status" "$reason")
+        summary_display_body+=$(ui_printf '\n  Final Status : %s\n  Reason       : %s' "$(ui_code "$status")" "$(ui_code "$reason")")
     fi
-    printf '%s\n' "$summary_body"
+    printf '%s\n' "$summary_display_body"
     (( persistence_failed == 0 )) || return 1
     return "$overall"
 }
@@ -2645,18 +3009,18 @@ main() {
     case "$first" in
         -h|--help)
             [[ -z "${2-}" ]] || {
-                printf 'help does not accept additional arguments\n' >&2
+                ui_printf 'help does not accept additional arguments\n' >&2
                 return 64
             }
             print_usage
             return 0
             ;;
         -n|--dry-run)
-            printf 'dry-run requires a configured SERVER_ID before %s\n' "$first" >&2
+            ui_printf 'dry-run requires a configured SERVER_ID before %s\n' "$first" >&2
             return 64
             ;;
         -r|--show-resolved)
-            printf '%s is only valid after -c or --check\n' "$first" >&2
+            ui_printf '%s is only valid after -c or --check\n' "$first" >&2
             return 64
             ;;
     esac
@@ -2665,17 +3029,17 @@ main() {
         -c|--check)
             if [[ "${2-}" == '-r' || "${2-}" == '--show-resolved' ]]; then
                 [[ -z "${3-}" ]] || {
-                    printf 'too many arguments for check\n' >&2
+                    ui_printf 'too many arguments for check\n' >&2
                     return 64
                 }
             elif [[ -n "${2-}" ]]; then
-                printf 'unknown check option: %s\n' "$2" >&2
+                ui_printf 'unknown check option: %s\n' "$2" >&2
                 return 64
             fi
             load_main_config || return 1
             check_dependencies || return 1
             check_private_keys "${SERVER_IDS[@]}" || return 1
-            printf 'SyncWarden configuration OK: %d server(s)\n' "${#SERVER_IDS[@]}"
+            ui_printf 'SyncWarden configuration OK: %d server(s)\n' "${#SERVER_IDS[@]}"
             if [[ "${2-}" == '-r' || "${2-}" == '--show-resolved' ]]; then
                 print_resolved_config
             fi
@@ -2683,7 +3047,7 @@ main() {
             ;;
         -l|--list)
             [[ -z "${2-}" ]] || {
-                printf '%s does not accept additional arguments\n' "$first" >&2
+                ui_printf '%s does not accept additional arguments\n' "$first" >&2
                 return 64
             }
             load_main_config || return 1
@@ -2692,12 +3056,12 @@ main() {
             ;;
         -t|--status)
             [[ -n "${2-}" && -z "${3-}" ]] || {
-                printf 'usage: syncwarden.sh %s SERVER_ID\n' "$first" >&2
+                ui_printf 'usage: syncwarden.sh %s SERVER_ID\n' "$first" >&2
                 return 64
             }
             load_main_config || return 1
             server_exists "$2" || {
-                printf 'unknown server ID: %s\n' "$2" >&2
+                ui_printf 'unknown server ID: %s\n' "$2" >&2
                 return 64
             }
             print_status "$2"
@@ -2705,7 +3069,7 @@ main() {
             ;;
         -s|--scheduled)
             [[ -z "${2-}" ]] || {
-                printf '%s does not accept additional arguments\n' "$first" >&2
+                ui_printf '%s does not accept additional arguments\n' "$first" >&2
                 return 64
             }
             load_runtime_config_or_log SCHEDULED || return 1
@@ -2719,18 +3083,18 @@ main() {
             scheduled_epoch=${SYNCWARDEN_NOW_EPOCH:-$(wall_now_epoch)}
             scheduled_hour=$(current_schedule_hour) || return 1
             if ! scheduled_due_now "$scheduled_hour"; then
-                printf 'No SyncWarden task is due at this hour.\n'
+                ui_printf 'No SyncWarden task is due at this hour.\n'
                 return 0
             fi
             scheduled_path=$(schedule_state_path "$scheduled_epoch" "$scheduled_hour") || return 1
             if schedule_slot_already_recorded "$scheduled_path"; then
-                printf 'This SyncWarden schedule slot is already completed: %s\n' "$scheduled_path"
+                ui_printf 'This SyncWarden schedule slot is already completed: %s\n' "$scheduled_path"
                 return 0
             fi
             local -a scheduled_ids=()
             scheduled_server_ids scheduled_ids
             (( ${#scheduled_ids[@]} > 0 )) || {
-                printf 'No servers are configured for scheduled synchronization.\n'
+                ui_printf 'No servers are configured for scheduled synchronization.\n'
                 return 0
             }
             local scheduled_rc scheduled_status
@@ -2746,12 +3110,12 @@ main() {
             ;;
         -a|--archive)
             [[ -n "${2-}" && -z "${3-}" ]] || {
-                printf 'usage: syncwarden.sh %s SERVER_ID\n' "$first" >&2
+                ui_printf 'usage: syncwarden.sh %s SERVER_ID\n' "$first" >&2
                 return 64
             }
             load_runtime_config_or_log ARCHIVE_ONLY || return 1
             server_exists "$2" || {
-                printf 'unknown server ID: %s\n' "$2" >&2
+                ui_printf 'unknown server ID: %s\n' "$2" >&2
                 return 64
             }
             check_dependencies || return 1
@@ -2765,17 +3129,17 @@ main() {
             return $?
             ;;
         -*)
-            printf 'unknown option: %s\n' "$first" >&2
+            ui_printf 'unknown option: %s\n' "$first" >&2
             print_brief_usage >&2
             return 64
             ;;
         *)
             if [[ -n "${2-}" && "${2-}" != '-n' && "${2-}" != '--dry-run' ]]; then
-                printf 'unknown argument for server %s: %s\n' "$first" "$2" >&2
+                ui_printf 'unknown argument for server %s: %s\n' "$first" "$2" >&2
                 return 64
             fi
             [[ -z "${3-}" ]] || {
-                printf 'too many arguments\n' >&2
+                ui_printf 'too many arguments\n' >&2
                 return 64
             }
             local manual_lock_rc dry_run=0 manual_mode='MANUAL'
@@ -2787,7 +3151,7 @@ main() {
                 load_runtime_config_or_log MANUAL || return 1
             fi
             server_exists "$first" || {
-                printf 'unknown server ID: %s\n' "$first" >&2
+                ui_printf 'unknown server ID: %s\n' "$first" >&2
                 return 64
             }
             check_dependencies || return 1
@@ -2838,18 +3202,18 @@ persist_global_timeout() {
     local body
 
     ensure_home_layout || {
-        printf 'global timeout log error: cannot initialize SyncWarden control directories\n' >&2
+        ui_printf 'global timeout log error: cannot initialize SyncWarden control directories\n' >&2
         return 1
     }
     refresh_log_paths || {
-        printf 'global timeout log error: cannot determine monthly failure log\n' >&2
+        ui_printf 'global timeout log error: cannot determine monthly failure log\n' >&2
         return 1
     }
     body=$(printf '  Time       : %s\n  Run ID     : %s\n  Mode       : %s\n  Stage      : GLOBAL_RUNTIME\n  Reason     : GLOBAL_TIMEOUT\n  Exit Code  : 124\n  Limit      : %s (%s seconds)' \
         "$(timestamp_now)" "$run_id" "$mode" \
         "$(format_global_runtime_limit)" "$GLOBAL_RUNTIME_TIMEOUT_SECONDS")
     append_log_block "$FAILURE_LOG" 'FAILURE - GLOBAL TIMEOUT' "$body" || {
-        printf 'global timeout log error: cannot append to %s\n' "$FAILURE_LOG" >&2
+        ui_printf 'global timeout log error: cannot append to %s\n' "$FAILURE_LOG" >&2
         return 1
     }
 }
@@ -2863,7 +3227,7 @@ run_with_global_timeout() {
     fi
 
     if ! command -v "$TIMEOUT_BIN" >/dev/null 2>&1; then
-        printf 'required command not found: timeout\n' >&2
+        ui_printf 'required command not found: timeout\n' >&2
         return 1
     fi
 
@@ -2879,7 +3243,7 @@ run_with_global_timeout() {
     rc=$?
 
     if (( rc == 124 )); then
-        printf 'SyncWarden global runtime limit exceeded: %s; mode=%s; reason=GLOBAL_TIMEOUT\n' \
+        ui_printf 'SyncWarden global runtime limit exceeded: %s; mode=%s; reason=GLOBAL_TIMEOUT\n' \
             "$(format_global_runtime_limit)" "$mode" >&2
         if mode_persists_global_timeout "$mode"; then
             persist_global_timeout "$mode" "$run_id" || :
